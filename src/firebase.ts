@@ -36,6 +36,7 @@ import {
   Appointment,
   Service,
   UserProfile,
+  AppNotification,
 } from './types';
 
 // 1. Initialize Firebase
@@ -584,7 +585,7 @@ export async function saveAppointmentFirestore(app: Appointment): Promise<void> 
   }
 }
 
-function cleanObject<T>(obj: T): T {
+export function cleanObject<T>(obj: T): T {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
@@ -650,6 +651,77 @@ export async function deleteServiceFirestore(serviceId: string): Promise<void> {
     await deleteDoc(doc(db, 'services', serviceId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// --- Notifications ---
+export function subscribeNotifications(onSuccess: (notifications: AppNotification[]) => void, onError?: (err: Error) => void) {
+  const path = 'notifications';
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const items: AppNotification[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        items.push({
+          id: docSnap.id,
+          userId: data.userId || 'all',
+          title: data.title || 'Notificación',
+          message: data.message || '',
+          type: data.type || 'system_alert',
+          read: Boolean(data.read),
+          linkTab: data.linkTab,
+          createdAt: data.createdAt || new Date().toISOString(),
+        } as AppNotification);
+      });
+      // Sort newest first
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      onSuccess(items);
+    },
+    (err) => {
+      if (onError) onError(err);
+      try { handleFirestoreError(err, OperationType.LIST, path); } catch (_) {}
+    }
+  );
+}
+
+export async function upsertNotificationFirestore(notif: AppNotification): Promise<void> {
+  const path = `notifications/${notif.id}`;
+  try {
+    const cleaned = cleanObject(notif);
+    await setDoc(doc(db, 'notifications', notif.id), cleaned);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function markNotificationReadFirestore(notifId: string): Promise<void> {
+  const path = `notifications/${notifId}`;
+  try {
+    await setDoc(doc(db, 'notifications', notifId), { read: true }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function deleteNotificationFirestore(notifId: string): Promise<void> {
+  const path = `notifications/${notifId}`;
+  try {
+    await deleteDoc(doc(db, 'notifications', notifId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function clearAllNotificationsFirestore(notificationIds: string[]): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    notificationIds.forEach((id) => {
+      batch.delete(doc(db, 'notifications', id));
+    });
+    await batch.commit();
+  } catch (error) {
+    console.warn('Error clearing notifications batch:', error);
   }
 }
 

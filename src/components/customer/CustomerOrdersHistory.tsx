@@ -18,7 +18,9 @@ import { useApp } from '../../context/AppContext';
 import { Order, OrderStatus, Appointment, AppointmentStatus } from '../../types';
 
 export const CustomerOrdersHistory: React.FC = () => {
-  const { orders, appointments, updateAppointmentStatus, businessProfile, theme, setCustomerTab, addToCart } = useApp();
+  const { orders, appointments, updateAppointmentStatus, updateOrderStatus, businessProfile, theme, setCustomerTab, addToCart } = useApp();
+  const uniqueOrders = Array.from(new Map(orders.map((o) => [o.id, o])).values());
+  const uniqueAppointments = Array.from(new Map(appointments.map((a) => [a.id, a])).values());
   const [ticketOrder, setTicketOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'pedidos' | 'citas'>('pedidos');
 
@@ -148,12 +150,12 @@ export const CustomerOrdersHistory: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => {
+            {uniqueOrders.map((order, index) => {
               const statusInfo = getOrderStatusBadge(order.status);
 
               return (
                 <div
-                  key={order.id}
+                  key={`${order.id}-${index}`}
                   className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4"
                 >
                   {/* Top Row */}
@@ -200,6 +202,19 @@ export const CustomerOrdersHistory: React.FC = () => {
                         <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
                         <span>Pedir de nuevo</span>
                       </button>
+                      {order.status === 'pendiente' && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm('¿Confirmas que deseas cancelar este pedido? Se liberará el stock automáticamente.')) {
+                              updateOrderStatus(order.id, 'cancelado');
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-rose-200"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Cancelar pedido</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -297,12 +312,12 @@ export const CustomerOrdersHistory: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {appointments.map((app) => {
+            {uniqueAppointments.map((app, index) => {
               const startDate = new Date(app.startTimeUtc);
               const endDate = new Date(app.endTimeUtc);
 
               return (
-                <div key={app.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                <div key={`${app.id}-${index}`} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
                   <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
                       <div className="text-xs font-bold text-rose-600 uppercase tracking-wider">

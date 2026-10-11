@@ -133,6 +133,11 @@ service cloud.firestore {
       allow get, list, create, update, delete: if true;
     }
 
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow get, list, create, update, delete: if true;
+    }
+
     // Global Catch-All: Deny unmatched documents
     match /{document=**} {
       allow read, write: if false;

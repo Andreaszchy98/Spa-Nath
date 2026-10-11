@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Spa Nath - Centro de Bienestar",
+  "short_name": "Spa Nath",
+  "description": "Gestión integral de citas, tratamientos de spa, productos y logística de pedidos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#f43f5e",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=192&fit=crop",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=512&fit=crop",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

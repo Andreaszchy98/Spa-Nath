@@ -14,6 +14,7 @@ import {
   Info,
   ShieldCheck,
   CalendarDays,
+  Loader2,
 } from 'lucide-react';
 import { Service } from '../../types';
 
@@ -57,6 +58,8 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   const [customerName, setCustomerName] = useState<string>(currentUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState<string>(currentUser?.phone || '');
   const [customerNotes, setCustomerNotes] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<{
     number: string;
     status: string;
@@ -96,10 +99,12 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     e.preventDefault();
     if (!selectedServiceId || !selectedDate || !selectedTime || !customerName.trim() || !customerPhone.trim()) return;
 
+    setSubmitting(true);
+    setBookingError(null);
     try {
       const newApp = await createAppointment({
         serviceId: selectedServiceId,
-        providerId: selectedProviderId,
+        providerId: selectedProviderId || (providers[0]?.id || 'prov-1'),
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerNotes: customerNotes.trim(),
@@ -116,13 +121,18 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
         deadlineMinutes: activeService?.providerResponseDeadlineMinutes || 60,
         modality: 'local',
       });
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Error creating appointment:', err);
+      setBookingError(err?.message || 'Hubo un error al registrar tu cita. Por favor intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleResetAndClose = () => {
     setSuccessApp(null);
+    setBookingError(null);
+    setSubmitting(false);
     setSelectedTime('');
     setCustomerNotes('');
     setCustomerName('');
@@ -453,28 +463,42 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
             </div>
 
             {/* Fixed Bottom Footer Button */}
-            <div className="p-4 bg-white border-t border-slate-100 shrink-0 space-y-1.5">
+            <div className="p-4 bg-white border-t border-slate-100 shrink-0 space-y-2">
               {missingMsg && (
                 <p className="text-[11px] text-amber-700 text-center font-medium">
                   Falta: {missingMsg}
                 </p>
               )}
+
+              {bookingError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="flex-1 font-medium">{bookingError}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={Boolean(missingMsg)}
-                className={`w-full py-3.5 rounded-2xl text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:bg-slate-300 disabled:cursor-not-allowed`}
+                disabled={Boolean(missingMsg) || submitting}
+                className={`w-full py-3.5 rounded-2xl text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
                 style={
-                  !missingMsg
+                  !missingMsg && !submitting
                     ? {
                         background: `linear-gradient(135deg, ${theme.raw.primaryBtn}, #b45309)`,
                       }
                     : undefined
                 }
               >
-                Confirmar cita ·{' '}
-                {activeService?.priceType === 'a_cotizar'
-                  ? 'A Cotizar'
-                  : `${businessProfile.currency}${activeService?.price || 0}`}
+                {submitting && <Loader2 className="w-4 h-4 animate-spin text-white" />}
+                <span>
+                  {submitting
+                    ? 'Confirmando tu cita...'
+                    : `Confirmar cita · ${
+                        activeService?.priceType === 'a_cotizar'
+                          ? 'A Cotizar'
+                          : `${businessProfile.currency}${activeService?.price || 0}`
+                      }`}
+                </span>
               </button>
             </div>
           </form>

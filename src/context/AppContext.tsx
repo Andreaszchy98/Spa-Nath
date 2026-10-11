@@ -2,6 +2,7 @@ import { doc, runTransaction, collection, setDoc, getDoc } from 'firebase/firest
 import { db } from '../firebase';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import {
+  INITIAL_APPOINTMENTS,
   INITIAL_BANNERS,
   INITIAL_BUSINESS_PROFILE,
   INITIAL_INGREDIENTS,
@@ -30,6 +31,9 @@ import {
   ThemeConfig,
   ThemeId,
   UserRole,
+  AppNotification,
+  NotificationType,
+  PushPreferences,
 } from '../types';
 import { getTheme, THEMES } from '../utils/themes';
 import {
@@ -44,6 +48,7 @@ import {
   subscribeExceptions,
   subscribeAppointments,
   subscribeServices,
+  subscribeNotifications,
   upsertProductFirestore,
   deleteProductFirestore,
   upsertIngredientFirestore,
@@ -63,6 +68,10 @@ import {
   deleteAppointmentFirestore,
   upsertServiceFirestore,
   deleteServiceFirestore,
+  upsertNotificationFirestore,
+  markNotificationReadFirestore,
+  deleteNotificationFirestore,
+  clearAllNotificationsFirestore,
   pushAllToFirestore,
   auth,
   loginWithGoogle,
@@ -75,7 +84,16 @@ import {
   onAuthStateChanged,
   isUserAdminEmail,
   ADMIN_EMAILS,
+  cleanObject,
 } from '../firebase';
+import {
+  getPushPermission,
+  requestPushPermission as requestPushPermissionService,
+  triggerDevicePushNotification,
+  loadPushPreferences,
+  savePushPreferences,
+  registerPushServiceWorker,
+} from '../services/pushNotificationService';
 
 interface AppContextType {
   // Theme
@@ -223,6 +241,26 @@ interface AppContextType {
     providerId: string,
     modality?: 'local' | 'domicilio'
   ) => string[];
+
+  // Push Notifications & Notification Center
+  notifications: AppNotification[];
+  unreadNotificationsCount: number;
+  pushPermission: NotificationPermission;
+  pushPreferences: PushPreferences;
+  requestPushPermission: () => Promise<NotificationPermission>;
+  updatePushPreferences: (prefs: Partial<PushPreferences>) => void;
+  sendPushNotification: (data: {
+    title: string;
+    message: string;
+    type: NotificationType;
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+    userId?: string;
+  }) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  clearAllNotifications: () => Promise<void>;
+  sendTestPushNotification: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -599,17 +637,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setOrders((prev) => [newOrder, ...prev]);
     saveOrderFirestore(newOrder).catch((err) => console.warn('Firestore saveOrder error:', err));
+
+    // Send push notification for new order
+    sendPushNotification({
+      title: '¡Nuevo Pedido Recibido!',
+      message: `Orden #${orderNumber} por ${businessProfile.currency}${newOrder.total.toFixed(2)} (${newOrder.customerName})`,
+      type: 'order_created',
+      linkTab: 'pedidos',
+    });
+
     return newOrder;
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    const target = orders.find((o) => o.id === orderId);
+    if (target && target.status !== 'cancelado' && status === 'cancelado') {
+      // 1. Restore product stock
+      target.items.forEach((item) => {
+        adjustStock(item.productId, item.quantity);
+      });
+
+      // 2. Restore central ingredient stock
+      const ingredientRestorations: Record<string, number> = {};
+      target.items.forEach((cartItem) => {
+        const prod = products.find((p) => p.id === cartItem.productId);
+        if (!prod) return;
+
+        if (prod.recipe && prod.recipe.length > 0) {
+          prod.recipe.forEach((recipeItem) => {
+            const totalReq = recipeItem.quantity * cartItem.quantity;
+            ingredientRestorations[recipeItem.ingredientId] =
+              (ingredientRestorations[recipeItem.ingredientId] || 0) + totalReq;
+          });
+        }
+
+        if (cartItem.selectedOptions && cartItem.selectedOptions.length > 0) {
+          cartItem.selectedOptions.forEach((selectedOpt) => {
+            for (const group of prod.optionGroups || []) {
+              const opt = group.options.find((o) => o.id === selectedOpt.optionId);
+              if (opt?.extraIngredientId) {
+                const qty = (opt.extraIngredientQuantity && opt.extraIngredientQuantity > 0) ? opt.extraIngredientQuantity : 1;
+                const extraTotal = qty * cartItem.quantity;
+                ingredientRestorations[opt.extraIngredientId] =
+                  (ingredientRestorations[opt.extraIngredientId] || 0) + extraTotal;
+              }
+            }
+          });
+        }
+      });
+
+      if (Object.keys(ingredientRestorations).length > 0) {
+        setIngredients((prev) =>
+          prev.map((ing) => {
+            const toRestore = ingredientRestorations[ing.id];
+            if (toRestore && toRestore > 0) {
+              const updatedStock = ing.stock + toRestore;
+              const updated = { ...ing, stock: updatedStock };
+              upsertIngredientFirestore(updated).catch(() => {});
+              return updated;
+            }
+            return ing;
+          })
+        );
+      }
+    }
+
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
     updateOrderStatusFirestore(orderId, status).catch((err) => console.warn('Firestore updateOrderStatus error:', err));
+    if (target) {
+      const notifTitle = status === 'cancelado' ? 'Pedido Cancelado' : 'Pedido Actualizado';
+      const notifMsg = status === 'cancelado' 
+        ? `La orden #${target.orderNumber} ha sido cancelada y se ha liberado el stock.`
+        : `La orden #${target.orderNumber} cambió a "${status}".`;
+      sendPushNotification({
+        title: notifTitle,
+        message: notifMsg,
+        type: 'order_updated',
+        linkTab: 'pedidos',
+      });
+    }
   };
 
   const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     updateAppointmentStatusFirestore(id, status).catch((err) => console.warn('Firestore updateAppointmentStatus error:', err));
+    const target = appointments.find((a) => a.id === id);
+    if (target) {
+      if (status === 'confirmada') {
+        sendPushNotification({
+          title: 'Cita Confirmada',
+          message: `La cita #${target.appointmentNumber} de ${target.customerName} ha sido confirmada.`,
+          type: 'appointment_updated',
+          linkTab: 'agenda',
+        });
+      } else if (status === 'completada') {
+        sendPushNotification({
+          title: 'Cita Completada',
+          message: `La cita #${target.appointmentNumber} de ${target.customerName} fue marcada como completada.`,
+          type: 'appointment_updated',
+          linkTab: 'agenda',
+        });
+      }
+    }
   };
 
   const deleteAppointment = async (id: string) => {
@@ -638,18 +767,129 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem(STORAGE_KEYS.ORDERS);
   };
 
+  // --- NOTIFICACIONES & ALERTAS PUSH ---
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    const saved = localStorage.getItem('bl_notifications_list');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => {
+    return getPushPermission();
+  });
+
+  const [pushPreferences, setPushPreferencesState] = useState<PushPreferences>(() => {
+    return loadPushPreferences();
+  });
+
+  const lastSeenNotifIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    localStorage.setItem('bl_notifications_list', JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    // Register Service Worker for background push on boot
+    registerPushServiceWorker().catch(() => {});
+  }, []);
+
+  const requestPushPermission = async (): Promise<NotificationPermission> => {
+    const perm = await requestPushPermissionService();
+    setPushPermission(perm);
+    return perm;
+  };
+
+  const updatePushPreferences = (updates: Partial<PushPreferences>) => {
+    setPushPreferencesState((prev) => {
+      const next = { ...prev, ...updates };
+      savePushPreferences(next);
+      return next;
+    });
+  };
+
+  const sendPushNotification = async (data: {
+    title: string;
+    message: string;
+    type: NotificationType;
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+    userId?: string;
+  }) => {
+    const newNotif: AppNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      title: data.title,
+      message: data.message,
+      type: data.type,
+      read: false,
+      linkTab: data.linkTab,
+      userId: data.userId || 'all',
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Play sound, vibrate, and show system push notification
+    triggerDevicePushNotification(newNotif, pushPreferences);
+
+    // 2. Add to local state (newest first)
+    setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+    lastSeenNotifIdsRef.current.add(newNotif.id);
+
+    // 3. Persist to Firestore
+    upsertNotificationFirestore(newNotif).catch((err) => {
+      console.warn('Firestore upsertNotification error:', err);
+    });
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    markNotificationReadFirestore(id).catch(() => {});
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    notifications.forEach((n) => {
+      if (!n.read) markNotificationReadFirestore(n.id).catch(() => {});
+    });
+  };
+
+  const deleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    deleteNotificationFirestore(id).catch(() => {});
+  };
+
+  const clearAllNotifications = async () => {
+    const ids = notifications.map((n) => n.id);
+    setNotifications([]);
+    clearAllNotificationsFirestore(ids).catch(() => {});
+  };
+
+  const sendTestPushNotification = async () => {
+    let perm = getPushPermission();
+    if (perm !== 'granted') {
+      perm = await requestPushPermission();
+      setPushPermission(perm);
+    }
+    await sendPushNotification({
+      title: '🔔 Alerta de Prueba - Spa Nath',
+      message: '¡Notificaciones push activadas correctamente! Recibirás avisos instantáneos de citas y pedidos en pantalla.',
+      type: 'system_alert',
+      linkTab: 'agenda',
+    });
+  };
+
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
+
   // --- MÓDULO DE SERVICIOS DE SPA (Separados de Productos, sin Stock ni SKU) ---
   const [services, setServices] = useState<Service[]>(() => {
     const saved = localStorage.getItem('bl_services_list');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Filter out legacy hardcoded sample services if user didn't upload them
-          const userCreated = parsed.filter(
-            (s: Service) => s && !s.id.startsWith('serv-massage') && !s.id.startsWith('serv-facial') && !s.id.startsWith('serv-hot-stones')
-          );
-          if (userCreated.length > 0) return userCreated;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
         }
       } catch (e) {
         console.error(e);
@@ -804,9 +1044,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('bl_appointments_list');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {}
     }
-    return [];
+    return INITIAL_APPOINTMENTS;
   });
 
   useEffect(() => {
@@ -824,23 +1069,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dateStr: string;
     timeStr: string;
   }): Promise<Appointment> => {
-    const service = services.find(s => s.id === data.serviceId) || products.find(p => p.id === data.serviceId);
-    const provider = providers.find(p => p.id === data.providerId);
-    if (!service) throw new Error('Servicio no encontrado');
+    const foundService =
+      services.find((s) => s.id === data.serviceId) ||
+      products.find((p) => p.id === data.serviceId) ||
+      services[0];
 
-    const appointmentModality: 'local' | 'domicilio' = data.modality || (('modality' in service && service.modality === 'domicilio') ? 'domicilio' : 'local');
+    const service = foundService || {
+      id: data.serviceId || 'serv-limpieza-espalda',
+      name: 'Limpieza profunda en espalda',
+      description: 'Tratamiento en cabina',
+      price: 450,
+      priceType: 'fijo' as const,
+      durationMinutes: 60,
+      bufferMinutes: 15,
+      modality: 'local' as const,
+      travelSurcharge: 0,
+      travelTimeMinutes: 0,
+      roundTripTravel: false,
+      maxHomeZoneKm: 10,
+      confirmationType: 'automatica' as const,
+      hybridHoursThreshold: 6,
+      providerResponseDeadlineMinutes: 120,
+      minCancellationHours: 4,
+      minNoticeHours: 2,
+      providerIds: ['prov-1'],
+      available: true,
+    };
 
-    const durationInfo = 'priceType' in service
-      ? calculateServiceTotalDuration(service as Service, appointmentModality)
-      : {
-          baseMinutes: service.durationMinutes || 60,
-          bufferMinutes: service.bufferMinutes || 0,
-          travelMinutes: 0,
-          totalMinutes: (service.durationMinutes || 60) + (service.bufferMinutes || 0),
-        };
+    const provider = providers.find((p) => p.id === data.providerId) || providers[0] || {
+      id: 'prov-1',
+      name: 'Nathalia Silva',
+      role: 'Terapeuta & Especialista Principal',
+      active: true,
+      weeklySchedule: INITIAL_WEEKLY_SCHEDULE,
+    };
 
-    const [year, month, day] = data.dateStr.split('-').map(Number);
-    const [hour, minute] = data.timeStr.split(':').map(Number);
+    const appointmentModality: 'local' | 'domicilio' =
+      data.modality ||
+      (('modality' in service && service.modality === 'domicilio') ? 'domicilio' : 'local');
+
+    const durationInfo =
+      'priceType' in service
+        ? calculateServiceTotalDuration(service as Service, appointmentModality)
+        : {
+            baseMinutes: service.durationMinutes || 60,
+            bufferMinutes: service.bufferMinutes || 0,
+            travelMinutes: 0,
+            totalMinutes: (service.durationMinutes || 60) + (service.bufferMinutes || 0),
+          };
+
+    const dateParts = (data.dateStr || '').split('-').map(Number);
+    const timeParts = (data.timeStr || '10:00').split(':').map(Number);
+    const year = dateParts[0] || new Date().getFullYear();
+    const month = dateParts[1] || new Date().getMonth() + 1;
+    const day = dateParts[2] || new Date().getDate();
+    const hour = timeParts[0] || 10;
+    const minute = timeParts[1] || 0;
 
     const startDate = new Date(year, month - 1, day, hour, minute, 0);
     const endDate = new Date(startDate.getTime() + durationInfo.totalMinutes * 60 * 1000);
@@ -854,7 +1138,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalPrice = 0;
     } else {
       const basePrice = service.price || 0;
-      const travelExtra = appointmentModality === 'domicilio' && servObj ? (servObj.travelSurcharge || 0) : 0;
+      const travelExtra =
+        appointmentModality === 'domicilio' && servObj ? servObj.travelSurcharge || 0 : 0;
       totalPrice = basePrice + travelExtra;
     }
 
@@ -870,65 +1155,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status = 'confirmada';
       }
     } else {
-      const isSameDay = startDate.getFullYear() === now.getFullYear() &&
-                        startDate.getMonth() === now.getMonth() &&
-                        startDate.getDate() === now.getDate();
+      const isSameDay =
+        startDate.getFullYear() === now.getFullYear() &&
+        startDate.getMonth() === now.getMonth() &&
+        startDate.getDate() === now.getDate();
       status = isSameDay ? 'pendiente' : 'confirmada';
     }
 
-    const deadlineMinutes = servObj ? (servObj.providerResponseDeadlineMinutes || 120) : 120;
+    const deadlineMinutes = servObj ? servObj.providerResponseDeadlineMinutes || 120 : 120;
     const deadlineMs = Math.min(now.getTime() + deadlineMinutes * 60 * 1000, startDate.getTime());
     const providerResponseDeadlineUtc = new Date(deadlineMs).toISOString();
 
     const appointmentNumber = `CITA-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    // Transactional create
+
     const newAppointmentRef = doc(collection(db, 'appointments'));
     const newAppointment: Appointment = {
       id: newAppointmentRef.id,
       appointmentNumber,
       serviceId: service.id,
       serviceName: service.name,
-      providerId: data.providerId,
-      providerName: provider ? provider.name : 'Personal',
+      providerId: data.providerId || provider?.id || 'prov-1',
+      providerName: provider ? provider.name : 'Personal de Spa',
       customerName: data.customerName,
       customerPhone: data.customerPhone,
       customerNotes: data.customerNotes || '',
       customerAddress: data.customerAddress || '',
       modality: appointmentModality,
-      travelDistanceKm: (appointmentModality === 'domicilio' && servObj) ? servObj.maxHomeZoneKm : 0,
-      travelSurcharge: (appointmentModality === 'domicilio' && servObj) ? servObj.travelSurcharge : 0,
-      priceType: servObj ? servObj.priceType : 'fijo',
+      travelDistanceKm: Number((appointmentModality === 'domicilio' && servObj) ? servObj.maxHomeZoneKm || 0 : 0),
+      travelSurcharge: Number((appointmentModality === 'domicilio' && servObj) ? servObj.travelSurcharge || 0 : 0),
+      priceType: servObj && servObj.priceType ? servObj.priceType : 'fijo',
       startTimeUtc: startDate.toISOString(),
       endTimeUtc: endDate.toISOString(),
       status,
-      totalPrice,
-      confirmationType: servObj ? servObj.confirmationType : 'automatica',
+      totalPrice: Number(totalPrice) || 0,
+      confirmationType: servObj && servObj.confirmationType ? servObj.confirmationType : 'automatica',
       providerResponseDeadlineUtc,
-      minCancellationHours: servObj ? servObj.minCancellationHours : 4,
+      minCancellationHours: Number(servObj?.minCancellationHours || 4),
       createdAt: new Date().toISOString(),
     };
 
-    await runTransaction(db, async (transaction) => {
-      transaction.set(newAppointmentRef, newAppointment);
-      // Notification
+    const cleanedAppointment = cleanObject(newAppointment);
+
+    try {
+      await setDoc(newAppointmentRef, cleanedAppointment);
+    } catch (saveError) {
+      console.warn('Advertencia al guardar cita en Firestore:', saveError);
+    }
+
+    try {
       const notifRef = doc(collection(db, 'notifications'));
-      transaction.set(notifRef, {
+      await setDoc(notifRef, {
         id: notifRef.id,
-        userId: data.providerId, // Notify provider
+        userId: data.providerId || provider?.id || 'admin',
         message: `Nueva cita: ${data.customerName} para ${service.name} el ${data.dateStr} a las ${data.timeStr}`,
         type: 'appointment_created',
         read: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
+    } catch (notifErr) {
+      console.warn('Advertencia escribiendo notificación de cita:', notifErr);
+    }
+
+    setAppointments((prev) => [newAppointment, ...prev]);
+
+    // Send device and system push notification
+    sendPushNotification({
+      title: '¡Nueva Cita Agendada!',
+      message: `${data.customerName} reservó ${service.name} para el ${data.dateStr} a las ${data.timeStr}`,
+      type: 'appointment_created',
+      linkTab: 'agenda',
     });
 
-    setAppointments(prev => [newAppointment, ...prev]);
     return newAppointment;
   };
 
   const cancelAppointment = async (id: string) => {
-    const app = appointments.find(a => a.id === id);
+    const app = appointments.find((a) => a.id === id);
     if (!app) throw new Error('Cita no encontrada');
 
     const now = new Date();
@@ -939,21 +1241,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error(`No se puede cancelar con menos de ${app.minCancellationHours || 4} horas de anticipación.`);
     }
 
-    await runTransaction(db, async (transaction) => {
-      const appRef = doc(db, 'appointments', id);
-      transaction.update(appRef, { status: 'cancelada' });
-      
-      const notifRef = doc(collection(db, 'notifications'));
-      transaction.set(notifRef, {
-        id: notifRef.id,
-        userId: app.providerId,
-        message: `Cita cancelada: ${app.appointmentNumber}`,
-        type: 'appointment_cancelled',
-        read: false,
-        createdAt: new Date().toISOString()
+    try {
+      await runTransaction(db, async (transaction) => {
+        const appRef = doc(db, 'appointments', id);
+        transaction.update(appRef, { status: 'cancelada' });
+
+        try {
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            id: notifRef.id,
+            userId: app.providerId || 'admin',
+            message: `Cita cancelada: ${app.appointmentNumber}`,
+            type: 'appointment_cancelled',
+            read: false,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (_) {}
       });
+    } catch (txError) {
+      console.warn('Error en transacción de cancelación:', txError);
+      await updateAppointmentStatusFirestore(id, 'cancelada').catch(() => {});
+    }
+
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: 'cancelada' } : a))
+    );
+
+    // Send push notification for cancellation
+    sendPushNotification({
+      title: 'Cita Cancelada',
+      message: `La cita ${app.appointmentNumber} (${app.customerName}) ha sido cancelada.`,
+      type: 'appointment_cancelled',
+      linkTab: 'agenda',
     });
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'cancelada' } : a));
   };
 
   const getAvailableSlotsForDate = (
@@ -1178,6 +1498,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, () => {});
 
+    // Subscribe to notifications directly from database
+    const unsubNotifications = subscribeNotifications((remoteNotifs) => {
+      if (!isMounted) return;
+      setNotifications(remoteNotifs);
+
+      // Trigger push for unseen new incoming notifications
+      if (lastSeenNotifIdsRef.current.size > 0) {
+        remoteNotifs.forEach((n) => {
+          if (!lastSeenNotifIdsRef.current.has(n.id) && !n.read) {
+            triggerDevicePushNotification(n, pushPreferences);
+          }
+        });
+      }
+      lastSeenNotifIdsRef.current = new Set(remoteNotifs.map((n) => n.id));
+    }, () => {});
+
     // Subscribe to business profile
     const unsubProfile = subscribeBusinessProfile(
       (remoteProfile) => {
@@ -1210,6 +1546,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubExceptions();
       unsubAppointments();
       unsubServices();
+      unsubNotifications();
     };
   }, []);
 
@@ -1655,6 +1992,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteAppointment,
         cancelAppointment,
         getAvailableSlotsForDate,
+        notifications,
+        unreadNotificationsCount,
+        pushPermission,
+        pushPreferences,
+        requestPushPermission,
+        updatePushPreferences,
+        sendPushNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        deleteNotification,
+        clearAllNotifications,
+        sendTestPushNotification,
       }}
     >
       {children}

@@ -63,7 +63,8 @@ export const AdminSchedule: React.FC = () => {
   const activeScheduleProvider = providers.find((p) => p.id === selectedScheduleProviderId) || providers[0];
   const currentProviderSchedule = activeScheduleProvider?.weeklySchedule || weeklySchedule;
 
-  const filteredAppointments = appointments.filter((app) => {
+  const uniqueAppointments = Array.from(new Map(appointments.map((a) => [a.id, a])).values());
+  const filteredAppointments = uniqueAppointments.filter((app) => {
     if (statusFilter === 'todas') return true;
     return app.status === statusFilter;
   });
@@ -158,7 +159,7 @@ export const AdminSchedule: React.FC = () => {
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       {/* Header & Subtabs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
@@ -237,53 +238,73 @@ export const AdminSchedule: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredAppointments.map((app) => {
+              {filteredAppointments.map((app, index) => {
                 const startDate = new Date(app.startTimeUtc);
                 const endDate = new Date(app.endTimeUtc);
                 return (
-                  <div key={app.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
+                  <div key={`${app.id}-${index}`} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow space-y-4">
+                    {/* Encabezado: Título con flex: 1 y min-width: 0, badge alineado arriba a la derecha */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
                         <div className="text-xs font-bold text-rose-600 tracking-wide uppercase">
                           {app.appointmentNumber}
                         </div>
-                        <h3 className="text-base font-bold text-slate-800 mt-0.5">{app.serviceName}</h3>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800 mt-0.5 break-words">
+                          {app.serviceName}
+                        </h3>
                       </div>
-                      <div>{getStatusBadge(app.status)}</div>
+                      <div className="shrink-0 self-start pt-0.5">
+                        {getStatusBadge(app.status)}
+                      </div>
                     </div>
 
-                    <div className="bg-slate-50 p-3.5 rounded-xl space-y-2 text-sm text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-slate-400" />
-                        <span className="font-semibold text-slate-700">
+                    {/* Bloque de detalles (16px, etiquetas en gris, valores en negrita, teléfono en segunda línea) */}
+                    <div className="bg-slate-50 p-4 rounded-2xl space-y-2.5 text-base text-slate-600">
+                      <div className="flex items-center gap-2.5 text-[15px] sm:text-base">
+                        <CalendarDays className="w-5 h-5 text-slate-400 shrink-0" />
+                        <span className="font-bold text-slate-800 capitalize">
                           {startDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-slate-400" />
-                        <span>
+                      <div className="flex items-center gap-2.5 text-[15px] sm:text-base">
+                        <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+                        <span className="font-bold text-slate-800">
                           {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
                           {endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-400" />
-                        <span>Cliente: <strong className="text-slate-800">{app.customerName}</strong> ({app.customerPhone})</span>
+                      <div className="flex items-start gap-2.5 text-[15px] sm:text-base">
+                        <User className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <div>
+                            <span className="text-slate-500 font-normal">Cliente: </span>
+                            <span className="font-bold text-slate-900">{app.customerName}</span>
+                          </div>
+                          {app.customerPhone && (
+                            <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-normal">
+                              <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{app.customerPhone}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Scissors className="w-4 h-4 text-slate-400" />
-                        <span>Especialista: <strong className="text-slate-800">{app.providerName}</strong></span>
+                      <div className="flex items-center gap-2.5 text-[15px] sm:text-base">
+                        <Scissors className="w-5 h-5 text-slate-400 shrink-0" />
+                        <div>
+                          <span className="text-slate-500 font-normal">Especialista: </span>
+                          <span className="font-bold text-slate-900">{app.providerName}</span>
+                        </div>
                       </div>
 
                       {/* Modalidad y Domicilio */}
-                      <div className="pt-1.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-1 text-xs">
-                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                      <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-1 text-xs">
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] ${
                           app.modality === 'domicilio' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
                         }`}>
                           {app.modality === 'domicilio' ? 'A Domicilio' : 'En Spa / Local'}
                         </span>
                         {app.customerAddress && (
-                          <span className="text-[11px] text-slate-600 truncate max-w-xs">
+                          <span className="text-xs text-slate-600 truncate max-w-xs">
                             📍 {app.customerAddress}
                           </span>
                         )}
@@ -291,7 +312,7 @@ export const AdminSchedule: React.FC = () => {
 
                       {/* Plazo de respuesta proveedor si está pendiente */}
                       {app.status === 'pendiente' && app.providerResponseDeadlineUtc && (
-                        <div className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-center justify-between">
+                        <div className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex items-center justify-between">
                           <span>⏱ Plazo máx respuesta proveedor:</span>
                           <strong>
                             {new Date(app.providerResponseDeadlineUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -300,54 +321,64 @@ export const AdminSchedule: React.FC = () => {
                       )}
 
                       {app.customerNotes && (
-                        <div className="text-xs text-slate-500 italic pt-1 border-t border-slate-200">
+                        <div className="text-xs text-slate-500 italic pt-1.5 border-t border-slate-200">
                           Notas: "{app.customerNotes}"
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                      <div>
-                        <span className="text-base font-bold text-slate-900">
-                          {app.priceType === 'a_cotizar' ? 'A Cotizar' : `${businessProfile.currency}${app.totalPrice.toFixed(2)}`}
-                        </span>
-                        {app.travelSurcharge && app.travelSurcharge > 0 ? (
-                          <span className="text-[10px] text-amber-700 block font-medium">
-                            (incluye +{businessProfile.currency}{app.travelSurcharge} traslado)
+                    {/* Footer de la tarjeta: 2 filas */}
+                    <div className="pt-3 border-t border-slate-100">
+                      {/* Fila 1: Precio a la izquierda en grande y negrita, basura a la derecha pequeño y discreto */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xl sm:text-2xl font-bold text-slate-900">
+                            {app.priceType === 'a_cotizar' ? 'A Cotizar' : `${businessProfile.currency}${app.totalPrice.toFixed(2)}`}
                           </span>
-                        ) : null}
+                          {app.travelSurcharge && app.travelSurcharge > 0 ? (
+                            <span className="text-xs text-amber-700 block font-medium">
+                              (incluye +{businessProfile.currency}{app.travelSurcharge} traslado)
+                            </span>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => deleteAppointment(app.id)}
+                          className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors"
+                          title="Eliminar registro"
+                          aria-label="Eliminar cita"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {app.status === 'pendiente' && (
+
+                      {/* Fila 2: Separación de 16px, 2 botones de igual ancho con gap de 12px */}
+                      <div className="mt-4 grid grid-cols-2 gap-[12px]">
+                        {app.status === 'pendiente' ? (
                           <button
+                            type="button"
                             onClick={() => updateAppointmentStatus(app.id, 'confirmada')}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
+                            className="w-full h-[48px] rounded-[14px] whitespace-nowrap text-[15px] font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors flex items-center justify-center px-2"
                           >
                             Aprobar Cita
                           </button>
-                        )}
-                        {app.status === 'confirmada' && (
+                        ) : (
                           <button
+                            type="button"
                             onClick={() => updateAppointmentStatus(app.id, 'completada')}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                            disabled={app.status === 'completada' || app.status === 'cancelada'}
+                            className="w-full h-[48px] rounded-[14px] whitespace-nowrap text-[15px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:bg-blue-100 disabled:text-blue-700 text-white shadow-xs transition-colors flex items-center justify-center px-2"
                           >
-                            Marcar Completada
-                          </button>
-                        )}
-                        {app.status !== 'cancelada' && (
-                          <button
-                            onClick={() => updateAppointmentStatus(app.id, 'cancelada')}
-                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-medium transition-colors"
-                          >
-                            Cancelar
+                            {app.status === 'completada' ? 'Completada' : 'Marcar completada'}
                           </button>
                         )}
                         <button
-                          onClick={() => deleteAppointment(app.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                          title="Eliminar registro"
+                          type="button"
+                          onClick={() => updateAppointmentStatus(app.id, 'cancelada')}
+                          disabled={app.status === 'cancelada'}
+                          className="w-full h-[48px] rounded-[14px] whitespace-nowrap text-[15px] font-semibold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-600 border border-rose-100 transition-colors flex items-center justify-center px-2"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          Cancelar
                         </button>
                       </div>
                     </div>

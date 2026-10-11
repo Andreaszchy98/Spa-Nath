@@ -277,3 +277,30 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
+export type NotificationType =
+  | 'appointment_created'
+  | 'appointment_updated'
+  | 'appointment_cancelled'
+  | 'order_created'
+  | 'order_updated'
+  | 'system_alert';
+
+export interface AppNotification {
+  id: string;
+  userId?: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  read: boolean;
+  linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+  createdAt: string;
+}
+
+export interface PushPreferences {
+  enabled: boolean;
+  notifyAppointments: boolean;
+  notifyOrders: boolean;
+  notifyCancellations: boolean;
+  soundEnabled: boolean;
+}
+
