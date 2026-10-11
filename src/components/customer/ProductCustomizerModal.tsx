@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useId } from 'react';
-import { X, Check, AlertCircle, Plus, Minus, ShoppingBag, Info, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Check, AlertCircle, Plus, Minus, ShoppingBag, Tag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CartItem, SelectedOptionItem } from '../../types';
 
 export const ProductCustomizerModal: React.FC = () => {
   const { modalProductId, closeProductModal, products, addToCart, theme, businessProfile, ingredients } = useApp();
-  const notesId = useId();
 
   const product = products.find((p) => p.id === modalProductId);
 
   // Selected options map: groupId -> array of selected optionIds
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [imageError, setImageError] = useState(false);
 
@@ -32,7 +30,6 @@ export const ProductCustomizerModal: React.FC = () => {
 
     setSelections(initialMap);
     setQuantity(1);
-    setNotes('');
     setValidationErrors([]);
     setImageError(false);
   }, [modalProductId, product]);
@@ -117,7 +114,6 @@ export const ProductCustomizerModal: React.FC = () => {
       unitPrice,
       quantity,
       selectedOptions: flatSelectedList,
-      customerNotes: notes.trim() || undefined,
       imageUrl: product.imageUrl,
     };
 
@@ -238,12 +234,7 @@ export const ProductCustomizerModal: React.FC = () => {
           </div>
 
           {/* Option Groups */}
-          {product.optionGroups.length === 0 ? (
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 flex items-center gap-2">
-              <Info className="w-4 h-4 text-slate-400 shrink-0" />
-              <span>Este producto no requiere personalización adicional. Listo para ordenar.</span>
-            </div>
-          ) : (
+          {product.optionGroups.length > 0 && (
             <div className="space-y-4">
               {product.optionGroups.map((group) => {
                 const groupSelected = selections[group.id] || [];
@@ -353,21 +344,6 @@ export const ProductCustomizerModal: React.FC = () => {
               })}
             </div>
           )}
-
-          {/* Special Instructions Note */}
-          <div className="space-y-1.5 pt-1">
-            <label htmlFor={notesId} className="text-xs font-semibold text-slate-700 block">
-              Instrucciones especiales para cocina / preparación (opcional)
-            </label>
-            <input
-              id={notesId}
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej: Sin sal, aderezo aparte, bien dorado..."
-              className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors placeholder:text-slate-400"
-            />
-          </div>
 
           {/* Validation Errors */}
           {validationErrors.length > 0 && (

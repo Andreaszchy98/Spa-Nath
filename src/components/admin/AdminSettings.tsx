@@ -280,12 +280,7 @@ export const AdminSettings: React.FC = () => {
           </div>
         </div>
 
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-          <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Licencia: {businessProfile.licenseCode}</span>
-          </div>
-
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
           <button
             type="submit"
             className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all active:scale-95 ${theme.buttonClass}`}

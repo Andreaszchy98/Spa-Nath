@@ -313,7 +313,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                             ? 'bg-rose-50/40 shadow-xs ring-1'
                             : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
-                        style={isSelected ? { borderColor: theme.raw.primaryBtn, ringColor: theme.raw.primaryBtn } : undefined}
+                        style={isSelected ? { borderColor: theme.raw.primaryBtn, boxShadow: `0 0 0 2px ${theme.raw.primaryBtn}` } : undefined}
                       >
                         <img
                           src={prov.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}

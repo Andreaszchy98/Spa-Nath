@@ -41,24 +41,6 @@ const AppContent: React.FC = () => {
       {/* Global Modals & Drawers */}
       <ProductCustomizerModal />
       <CartDrawer />
-
-      {/* Footer */}
-      <footer className={`mt-auto border-t border-slate-200/80 bg-white/80 py-4 text-center text-xs text-slate-500 ${!isAdmin ? 'mb-16' : ''}`}>
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-slate-600" />
-            <span className="font-semibold text-slate-800">
-              {businessProfile.name || 'Plataforma Comercial'}
-            </span>
-            <span>· Pagos en Efectivo & Envíos</span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <span>Tema activo: {theme.name}</span>
-            <span>·</span>
-            <span>Licencia: {businessProfile.licenseCode}</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

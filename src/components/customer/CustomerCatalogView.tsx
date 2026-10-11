@@ -386,7 +386,7 @@ export const CustomerCatalogView: React.FC = () => {
         ) : (
           <div className="space-y-6">
             {Object.entries(productsByCategory).map(([categoryName, catProducts]) => {
-              const isCollapsed = collapsedCategories[categoryName] ?? true;
+              const isCollapsed = collapsedCategories[categoryName] ?? false;
               return (
                 <div key={categoryName} className="bg-slate-50/70 rounded-3xl border border-slate-200/80 overflow-hidden shadow-2xs">
                   {/* Category Header (Clickable Collapsible) */}

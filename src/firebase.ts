@@ -552,10 +552,27 @@ export function subscribeAppointments(onSuccess: (appointments: Appointment[]) =
 export async function saveAppointmentFirestore(app: Appointment): Promise<void> {
   const path = `appointments/${app.id}`;
   try {
-    await setDoc(doc(db, 'appointments', app.id), app);
+    const cleaned = cleanObject(app);
+    await setDoc(doc(db, 'appointments', app.id), cleaned);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
+}
+
+function cleanObject<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanObject) as unknown as T;
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanObject(value);
+    }
+  }
+  return cleaned as T;
 }
 
 export async function updateAppointmentStatusFirestore(appId: string, status: Appointment['status']): Promise<void> {
