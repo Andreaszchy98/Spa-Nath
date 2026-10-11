@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Product in the catalog with prices, stock and recipe links",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["comida", "bebida", "producto_fisico", "servicio"] },
+        "price": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "minStockAlert": { "type": "number" },
+        "imageUrl": { "type": "string", "maxLength": 2000 },
+        "isDriveUrl": { "type": "boolean" },
+        "driveRawUrl": { "type": "string", "maxLength": 2000 },
+        "available": { "type": "boolean" },
+        "badge": { "type": "string", "maxLength": 100 },
+        "optionGroups": { "type": "array" },
+        "recipe": { "type": "array" }
+      },
+      "required": ["id", "name", "category", "price", "stock", "available"]
+    },
+    "Ingredient": {
+      "title": "Ingredient",
+      "description": "Raw material or supply in the central inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "unit": { "type": "string", "enum": ["g", "kg", "ml", "l", "oz", "unidad", "porcion"] },
+        "stock": { "type": "number" },
+        "minStockAlert": { "type": "number" },
+        "costPerUnit": { "type": "number" },
+        "category": { "type": "string", "maxLength": 100 },
+        "supplier": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["id", "name", "unit", "stock", "minStockAlert", "costPerUnit", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "orderNumber": { "type": "string", "maxLength": 50 },
+        "orderType": { "type": "string", "enum": ["recoger"] },
+        "customerName": { "type": "string", "maxLength": 200 },
+        "customerPhone": { "type": "string", "maxLength": 50 },
+        "customerNotes": { "type": "string", "maxLength": 1000 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["efectivo"] },
+        "cashPayment": { "type": "object" },
+        "paymentReceived": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pendiente", "en_preparacion", "en_ruta", "entregado", "cancelado"] },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "orderNumber", "customerName", "customerPhone", "items", "total", "status", "createdAt"]
+    },
+    "PromoBanner": {
+      "title": "PromoBanner",
+      "description": "Marketing promotional banner for storefront",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "subtitle": { "type": "string", "maxLength": 300 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "badge": { "type": "string", "enum": ["PROMOCIÓN", "PATROCINIO", "NOVEDAD", "ANUNCIO"] },
+        "imageUrl": { "type": "string", "maxLength": 2000 },
+        "targetProductId": { "type": "string", "maxLength": 128 },
+        "active": { "type": "boolean" },
+        "discountHighlight": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "title", "subtitle", "badge", "imageUrl", "active"]
+    },
+    "BusinessProfile": {
+      "title": "BusinessProfile",
+      "description": "Commercial profile, theme and configuration of the establishment",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 200 },
+        "slogan": { "type": "string", "maxLength": 300 },
+        "logoUrl": { "type": "string", "maxLength": 2000 },
+        "category": { "type": "string", "maxLength": 100 },
+        "currency": { "type": "string", "maxLength": 10 },
+        "currencyCode": { "type": "string", "maxLength": 10 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "address": { "type": "string", "maxLength": 300 },
+        "currentTheme": { "type": "string", "enum": ["default", "rojo", "cafe", "naranja"] },
+        "enableStockControl": { "type": "boolean" },
+        "licenseCode": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["name", "currency", "currentTheme"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Spa appointment service with duration, modalities, and confirmation rules",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 100 },
+        "price": { "type": "number" },
+        "priceType": { "type": "string", "enum": ["fijo", "desde", "a_cotizar"] },
+        "durationMinutes": { "type": "number" },
+        "bufferMinutes": { "type": "number" },
+        "modality": { "type": "string", "enum": ["local", "domicilio", "ambas"] },
+        "travelSurcharge": { "type": "number" },
+        "travelTimeMinutes": { "type": "number" },
+        "roundTripTravel": { "type": "boolean" },
+        "maxHomeZoneKm": { "type": "number" },
+        "confirmationType": { "type": "string", "enum": ["automatica", "aprobacion", "hibrida"] },
+        "hybridHoursThreshold": { "type": "number" },
+        "providerResponseDeadlineMinutes": { "type": "number" },
+        "minCancellationHours": { "type": "number" },
+        "providerIds": { "type": "array" },
+        "available": { "type": "boolean" }
+      },
+      "required": ["id", "name", "durationMinutes", "modality", "confirmationType"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store products with recipe links and option groups"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Spa services without stock or SKU"
+    },
+    "/ingredients/{ingredientId}": {
+      "schema": "Ingredient",
+      "description": "Raw inventory ingredients for warehouse tracking"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders and checkout records"
+    },
+    "/banners/{bannerId}": {
+      "schema": "PromoBanner",
+      "description": "Promotional banners displayed to clients"
+    },
+    "/business_profiles/{profileId}": {
+      "schema": "BusinessProfile",
+      "description": "Branding and business identity settings"
+    }
+  }
+}

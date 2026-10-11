@@ -1,0 +1,8 @@
+{
+  "name": "Spa Nath",
+  "description": "Sistema White-Label de gestión comercial, catálogo interactivo, ventas, inventario y logística de envíos para licenciar a múltiples negocios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

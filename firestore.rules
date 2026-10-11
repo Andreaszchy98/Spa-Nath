@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation functions
+    function isValidProduct(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() >= 0 && data.name.size() <= 200 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number &&
+             data.available is bool;
+    }
+
+    function isValidIngredient(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() >= 0 && data.name.size() <= 200 &&
+             data.unit is string && data.unit.size() <= 50 &&
+             data.stock is number &&
+             data.minStockAlert is number &&
+             data.costPerUnit is number &&
+             data.category is string && data.category.size() <= 100;
+    }
+
+    function isValidOrder(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.orderNumber is string && data.orderNumber.size() <= 50 &&
+             data.customerName is string && data.customerName.size() >= 0 && data.customerName.size() <= 200 &&
+             data.customerPhone is string && data.customerPhone.size() >= 0 && data.customerPhone.size() <= 50 &&
+             data.items is list && data.items.size() <= 100 &&
+             data.total is number && data.total >= 0 &&
+             data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    function isValidBanner(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.subtitle is string && data.subtitle.size() <= 300 &&
+             data.badge is string && data.badge.size() <= 50 &&
+             data.imageUrl is string && data.imageUrl.size() <= 2000 &&
+             data.active is bool;
+    }
+
+    // Connection test document
+    match /test/{testId} {
+      allow read, write: if true;
+    }
+
+    // Products collection
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create: if isValidId(productId) && isValidProduct(incoming());
+      allow update: if isValidId(productId);
+      allow delete: if isValidId(productId);
+    }
+
+    // Ingredients collection
+    match /ingredients/{ingredientId} {
+      allow get, list: if true;
+      allow create: if isValidId(ingredientId) && isValidIngredient(incoming());
+      allow update: if isValidId(ingredientId);
+      allow delete: if isValidId(ingredientId);
+    }
+
+    // Orders collection
+    match /orders/{orderId} {
+      allow get, list: if true;
+      allow create: if isValidId(orderId) && isValidOrder(incoming());
+      allow update: if isValidId(orderId);
+      allow delete: if isValidId(orderId);
+    }
+
+    // Banners collection
+    match /banners/{bannerId} {
+      allow get, list: if true;
+      allow create: if isValidId(bannerId) && isValidBanner(incoming());
+      allow update: if isValidId(bannerId);
+      allow delete: if isValidId(bannerId);
+    }
+
+    // Business profiles
+    match /business_profiles/{profileId} {
+      allow get, list: if true;
+      allow create: if isValidId(profileId);
+      allow update: if isValidId(profileId);
+      allow delete: if isValidId(profileId);
+    }
+
+    // Providers collection
+    match /providers/{providerId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    // Weekly schedule collection
+    match /weekly_schedule/{dayId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    // Schedule exceptions collection
+    match /exceptions/{excId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    // Appointments collection
+    match /appointments/{appId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    // Services collection
+    match /services/{serviceId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    // Global Catch-All: Deny unmatched documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
