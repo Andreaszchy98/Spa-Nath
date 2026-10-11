@@ -70,12 +70,13 @@ export interface Service {
   hybridHoursThreshold: number; // hours threshold for hybrid
   providerResponseDeadlineMinutes: number; // minutes, validated <= appointment start
   minCancellationHours: number;
+  minNoticeHours: number; // hours of notice required for same-day appointments
 
   providerIds: string[];
   available: boolean;
 }
 
-export type ProductType = 'comida' | 'bebida' | 'producto_fisico';
+export type ProductType = 'comida' | 'bebida' | 'producto_fisico' | 'servicio';
 
 export interface ProductOption {
   id: string;
@@ -152,7 +153,7 @@ export interface CartItem {
   imageUrl: string;
 }
 
-export type OrderStatus = 'pendiente' | 'en_preparacion' | 'entregado' | 'cancelado';
+export type OrderStatus = 'pendiente' | 'en_preparacion' | 'en_ruta' | 'entregado' | 'cancelado';
 
 export interface CashPaymentDetail {
   amountPaid: number; // Con cuánto paga el cliente
@@ -257,5 +258,22 @@ export interface CurrentUser {
   name: string;
   phone: string;
   address: string;
+  uid?: string;
+  email?: string;
+  photoUrl?: string;
+  isLoggedIn?: boolean;
+  authProvider?: 'google' | 'password' | 'guest';
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  phone?: string;
+  address?: string;
+  role: UserRole;
+  createdAt?: string;
+  updatedAt?: string;
 }
 

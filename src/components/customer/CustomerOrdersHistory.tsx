@@ -33,17 +33,24 @@ export const CustomerOrdersHistory: React.FC = () => {
         };
       case 'en_preparacion':
         return {
-          label: 'En Preparación / Cocina',
+          label: 'En Preparación / Tratamiento',
           bg: 'bg-blue-100 text-blue-900 border-blue-200',
           icon: <RotateCcw className="w-3.5 h-3.5" />,
           step: 2,
+        };
+      case 'en_ruta':
+        return {
+          label: 'En Camino / En Ruta',
+          bg: 'bg-indigo-100 text-indigo-900 border-indigo-200',
+          icon: <RotateCcw className="w-3.5 h-3.5" />,
+          step: 3,
         };
       case 'entregado':
         return {
           label: 'Entregado / Completado',
           bg: 'bg-emerald-100 text-emerald-900 border-emerald-200',
           icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-          step: 3,
+          step: 4,
         };
       case 'cancelado':
         return {
@@ -51,6 +58,13 @@ export const CustomerOrdersHistory: React.FC = () => {
           bg: 'bg-rose-100 text-rose-900 border-rose-200',
           icon: <AlertCircle className="w-3.5 h-3.5" />,
           step: 0,
+        };
+      default:
+        return {
+          label: 'En Proceso',
+          bg: 'bg-slate-100 text-slate-900 border-slate-200',
+          icon: <Clock className="w-3.5 h-3.5" />,
+          step: 1,
         };
     }
   };

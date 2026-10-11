@@ -52,6 +52,12 @@ export const AdminSalesOrders: React.FC = () => {
           bg: 'bg-blue-100 text-blue-900 border-blue-300',
           icon: <RotateCcw className="w-3.5 h-3.5" />,
         };
+      case 'en_ruta':
+        return {
+          label: 'En Camino / Entrega',
+          bg: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+          icon: <RotateCcw className="w-3.5 h-3.5" />,
+        };
       case 'entregado':
         return {
           label: 'Completado / Finalizado',
@@ -63,6 +69,12 @@ export const AdminSalesOrders: React.FC = () => {
           label: 'Cancelado',
           bg: 'bg-rose-100 text-rose-900 border-rose-300',
           icon: <XCircle className="w-3.5 h-3.5" />,
+        };
+      default:
+        return {
+          label: 'Pendiente',
+          bg: 'bg-slate-100 text-slate-900 border-slate-300',
+          icon: <Clock className="w-3.5 h-3.5" />,
         };
     }
   };

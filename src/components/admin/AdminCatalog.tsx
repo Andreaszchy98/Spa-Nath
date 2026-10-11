@@ -291,7 +291,7 @@ export const AdminCatalog: React.FC = () => {
       costPrice: Number(costPrice),
       stock: Number(stock),
       minStockAlert: Number(minStockAlert),
-      imageUrl: imageUrl.trim() || '/src/assets/images/product_craft_burger_1791387703846.jpg',
+      imageUrl: imageUrl.trim() || '',
       badge: badge.trim() || undefined,
       available: true,
       optionGroups,
@@ -465,7 +465,7 @@ export const AdminCatalog: React.FC = () => {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Ej: Hamburguesa BBQ Doble Tocino"
+                      placeholder="Ej: Facial Hidratante Premium"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>
@@ -478,7 +478,7 @@ export const AdminCatalog: React.FC = () => {
                       rows={2}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Ingredientes, preparación, características..."
+                      placeholder="Ingredientes, beneficios, aplicación..."
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>
@@ -493,8 +493,7 @@ export const AdminCatalog: React.FC = () => {
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     >
                       <option value="producto_fisico">Producto Físico / Retail</option>
-                      <option value="comida">Alimentos / Snack</option>
-                      <option value="bebida">Bebida / Cafetería / Infusión</option>
+                      <option value="servicio">Servicio / Tratamiento</option>
                     </select>
                   </div>
 
@@ -506,7 +505,7 @@ export const AdminCatalog: React.FC = () => {
                       type="text"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      placeholder="Ej: Hamburguesas, Cafés, Postres..."
+                      placeholder="Ej: Faciales, Masajes, Cremas..."
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>

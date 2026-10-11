@@ -44,6 +44,15 @@ export const CartDrawer: React.FC = () => {
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (currentUser.name && !customerName) {
+      setCustomerName(currentUser.name);
+    }
+    if (currentUser.phone && !customerPhone) {
+      setCustomerPhone(currentUser.phone);
+    }
+  }, [currentUser.name, currentUser.phone]);
+
   if (!isCartDrawerOpen) return null;
 
   const grandTotal = cartTotal;

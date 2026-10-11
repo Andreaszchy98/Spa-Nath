@@ -128,6 +128,11 @@ service cloud.firestore {
       allow get, list, create, update, delete: if true;
     }
 
+    // Users collection
+    match /users/{userId} {
+      allow get, list, create, update, delete: if true;
+    }
+
     // Global Catch-All: Deny unmatched documents
     match /{document=**} {
       allow read, write: if false;

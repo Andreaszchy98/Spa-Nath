@@ -66,6 +66,7 @@ export const AdminServices: React.FC = () => {
   const [hybridHoursThreshold, setHybridHoursThreshold] = useState<number>(6);
   const [providerResponseDeadlineMinutes, setProviderResponseDeadlineMinutes] = useState<number>(120);
   const [minCancellationHours, setMinCancellationHours] = useState<number>(4);
+  const [minNoticeHours, setMinNoticeHours] = useState<number>(2);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>(
     providers.length > 0 ? [providers[0].id] : []
   );
@@ -89,6 +90,7 @@ export const AdminServices: React.FC = () => {
     setHybridHoursThreshold(6);
     setProviderResponseDeadlineMinutes(120);
     setMinCancellationHours(4);
+    setMinNoticeHours(2);
     setSelectedProviderIds(providers.length > 0 ? [providers[0].id] : []);
     setIsEditorOpen(true);
   };
@@ -112,6 +114,7 @@ export const AdminServices: React.FC = () => {
     setHybridHoursThreshold(serv.hybridHoursThreshold || 6);
     setProviderResponseDeadlineMinutes(serv.providerResponseDeadlineMinutes || 120);
     setMinCancellationHours(serv.minCancellationHours || 4);
+    setMinNoticeHours(serv.minNoticeHours || 2);
     setSelectedProviderIds(serv.providerIds || (providers.length > 0 ? [providers[0].id] : []));
     setIsEditorOpen(true);
   };
@@ -142,6 +145,7 @@ export const AdminServices: React.FC = () => {
       hybridHoursThreshold: finalConfirmationType === 'hibrida' ? Math.max(1, Number(hybridHoursThreshold)) : 6,
       providerResponseDeadlineMinutes: Math.max(10, Number(providerResponseDeadlineMinutes)),
       minCancellationHours: Math.max(0, Number(minCancellationHours)),
+      minNoticeHours: Math.max(1, Number(minNoticeHours)),
       providerIds: selectedProviderIds,
       available: true,
     };

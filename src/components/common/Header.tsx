@@ -10,6 +10,7 @@ import {
   Settings,
   ChevronDown,
   Calendar,
+  Store,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuthModal } from './AuthModal';
@@ -19,6 +20,7 @@ export const Header: React.FC = () => {
     theme,
     businessProfile,
     currentUser,
+    switchRole,
     cartCount,
     setIsCartDrawerOpen,
     adminTab,
@@ -174,7 +176,7 @@ export const Header: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/15 transition-all shrink-0 active:scale-95"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/15 transition-all shrink-0 active:scale-95"
               title="Abrir inicio de sesión / cambiar perfil"
             >
               {isAdmin ? (
@@ -183,13 +185,25 @@ export const Header: React.FC = () => {
                   <span className="hidden xs:inline">Admin:</span>
                   <span className="text-indigo-100">Gerencia</span>
                 </>
+              ) : currentUser.isLoggedIn ? (
+                <>
+                  {currentUser.photoUrl ? (
+                    <img
+                      src={currentUser.photoUrl}
+                      alt={currentUser.name}
+                      className="w-4 h-4 rounded-full object-cover border border-white/30"
+                    />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-emerald-300" />
+                  )}
+                  <span className="truncate max-w-[85px] sm:max-w-[110px]">
+                    {currentUser.name || 'Mi Cuenta'}
+                  </span>
+                </>
               ) : (
                 <>
-                  <User className="w-3.5 h-3.5 text-emerald-300" />
-                  <span className="hidden xs:inline truncate max-w-[90px]">
-                    {currentUser.name || 'Cliente'}
-                  </span>
-                  <span className="xs:hidden">Cliente</span>
+                  <User className="w-3.5 h-3.5 text-white/80" />
+                  <span>Acceder</span>
                 </>
               )}
               <ChevronDown className="w-3 h-3 text-white/70 ml-0.5" />
@@ -270,6 +284,20 @@ export const Header: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Quick Preview Store button for the admin */}
+            <button
+              type="button"
+              onClick={() => {
+                switchRole('client');
+                setCustomerTab('catalogo');
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95"
+              title="Ver cómo ve la tienda un cliente"
+            >
+              <Store className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden xs:inline">Vista Cliente</span>
+            </button>
           </div>
         )}
       </header>

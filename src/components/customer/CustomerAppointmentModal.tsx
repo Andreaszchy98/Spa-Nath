@@ -35,6 +35,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     getAvailableSlotsForDate,
     businessProfile,
     theme,
+    currentUser,
   } = useApp();
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
@@ -53,8 +54,8 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>(''); // Vacío por requerimiento
-  const [customerPhone, setCustomerPhone] = useState<string>('');
+  const [customerName, setCustomerName] = useState<string>(currentUser?.name || '');
+  const [customerPhone, setCustomerPhone] = useState<string>(currentUser?.phone || '');
   const [customerNotes, setCustomerNotes] = useState<string>('');
   const [successApp, setSuccessApp] = useState<{
     number: string;
@@ -91,12 +92,12 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   if (selectedDate && selectedTime) currentStep = 3;
   if (customerName.trim() && customerPhone.trim()) currentStep = 4;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedServiceId || !selectedDate || !selectedTime || !customerName.trim() || !customerPhone.trim()) return;
 
     try {
-      const newApp = createAppointment({
+      const newApp = await createAppointment({
         serviceId: selectedServiceId,
         providerId: selectedProviderId,
         customerName: customerName.trim(),
@@ -213,7 +214,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                 </div>
                 <p>Esta cita requiere revisión manual del terapeuta o administrador del spa.</p>
                 <p className="text-[11px] text-amber-700">
-                  ⏱ Plazo de respuesta: <strong>60 minutos</strong>.
+                  ⏱ Plazo de respuesta: <strong>{activeService?.providerResponseDeadlineMinutes || 60} minutos</strong>.
                 </p>
               </div>
             ) : (
@@ -394,7 +395,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                 )}
 
                 <p className="text-[11px] text-slate-400 italic">
-                  * Mínimo 2 horas de anticipación para agendar citas el mismo día.
+                  * Mínimo {activeService?.minNoticeHours || 2} horas de anticipación para agendar citas el mismo día.
                 </p>
               </div>
 
@@ -440,12 +441,12 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-around text-[11px] text-slate-600 gap-2">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>Plazo de respuesta: <strong>60 min</strong></span>
+                    <span>Plazo de respuesta: <strong>{activeService.providerResponseDeadlineMinutes || 60} min</strong></span>
                   </div>
                   <div className="h-4 w-px bg-slate-200" />
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span>Cancelaciones con <strong>4 horas</strong></span>
+                    <span>Cancelaciones con <strong>{activeService.minCancellationHours || 4} horas</strong></span>
                   </div>
                 </div>
               )}

@@ -1,3 +1,5 @@
+import { doc, runTransaction, collection, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import {
   INITIAL_BANNERS,
@@ -62,6 +64,17 @@ import {
   upsertServiceFirestore,
   deleteServiceFirestore,
   pushAllToFirestore,
+  auth,
+  loginWithGoogle,
+  loginWithEmail,
+  registerWithEmail,
+  sendPasswordReset,
+  logoutUser,
+  getUserProfileFirestore,
+  upsertUserProfileFirestore,
+  onAuthStateChanged,
+  isUserAdminEmail,
+  ADMIN_EMAILS,
 } from '../firebase';
 
 interface AppContextType {
@@ -113,10 +126,19 @@ interface AppContextType {
   deleteOrder: (orderId: string) => void;
   clearAllOrders: () => void;
 
-  // Auth / Role
+  // Auth / Role / Users
   currentUser: CurrentUser;
+  isAdminUser: boolean;
   switchRole: (role: UserRole) => void;
   updateCurrentUser: (updates: Partial<CurrentUser>) => void;
+  loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  registerWithEmail: (email: string, password: string, name: string) => Promise<void>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  logout: () => Promise<void>;
+  authLoading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
 
   // Shopping Cart
   cart: CartItem[];
@@ -191,9 +213,10 @@ interface AppContextType {
     modality?: 'local' | 'domicilio';
     dateStr: string;
     timeStr: string;
-  }) => Appointment;
+  }) => Promise<Appointment>;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
   deleteAppointment: (id: string) => void;
+  cancelAppointment: (id: string) => Promise<void>;
   getAvailableSlotsForDate: (
     serviceId: string,
     dateStr: string,
@@ -584,6 +607,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateOrderStatusFirestore(orderId, status).catch((err) => console.warn('Firestore updateOrderStatus error:', err));
   };
 
+  const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    updateAppointmentStatusFirestore(id, status).catch((err) => console.warn('Firestore updateAppointmentStatus error:', err));
+  };
+
+  const deleteAppointment = async (id: string) => {
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+    await deleteAppointmentFirestore(id).catch((err) => console.warn('Firestore deleteAppointment error:', err));
+  };
+
   const markOrderPaymentReceived = (orderId: string, received: boolean) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, paymentReceived: received } : o)));
     const target = orders.find((o) => o.id === orderId);
@@ -780,7 +813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('bl_appointments_list', JSON.stringify(appointments));
   }, [appointments]);
 
-  const createAppointment = (data: {
+  const createAppointment = async (data: {
     serviceId: string;
     providerId: string;
     customerName: string;
@@ -790,14 +823,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     modality?: 'local' | 'domicilio';
     dateStr: string;
     timeStr: string;
-  }): Appointment => {
+  }): Promise<Appointment> => {
     const service = services.find(s => s.id === data.serviceId) || products.find(p => p.id === data.serviceId);
     const provider = providers.find(p => p.id === data.providerId);
     if (!service) throw new Error('Servicio no encontrado');
 
     const appointmentModality: 'local' | 'domicilio' = data.modality || (('modality' in service && service.modality === 'domicilio') ? 'domicilio' : 'local');
 
-    // Centralized duration calculation: (duración + pausa + traslado según modalidad y ida/vuelta)
     const durationInfo = 'priceType' in service
       ? calculateServiceTotalDuration(service as Service, appointmentModality)
       : {
@@ -814,7 +846,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const endDate = new Date(startDate.getTime() + durationInfo.totalMinutes * 60 * 1000);
     const now = new Date();
 
-    // Price calculation: Si el precio es "a cotizar", el precio es 0 (opcional/a cotizar), de lo contrario precio base + recargo domicilio
     let totalPrice = 0;
     const isServiceObj = 'priceType' in service;
     const servObj = isServiceObj ? (service as Service) : null;
@@ -827,11 +858,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalPrice = basePrice + travelExtra;
     }
 
-    // Regla de confirmación:
-    // - Si precio es "a cotizar", requiere aprobación siempre ('pendiente')
-    // - Si confirmación es "aprobacion", siempre manual ('pendiente')
-    // - Si confirmación es "hibrida", automática salvo cuando falten menos de X horas (hybridHoursThreshold)
-    // - Si confirmación es "automatica", confirmada
     let status: AppointmentStatus = 'confirmada';
     if (servObj) {
       if (servObj.priceType === 'a_cotizar' || servObj.confirmationType === 'aprobacion') {
@@ -850,14 +876,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status = isSameDay ? 'pendiente' : 'confirmada';
     }
 
-    // Provider response deadline: en minutos, validado que el plazo NUNCA supere el inicio de la cita
     const deadlineMinutes = servObj ? (servObj.providerResponseDeadlineMinutes || 120) : 120;
     const deadlineMs = Math.min(now.getTime() + deadlineMinutes * 60 * 1000, startDate.getTime());
     const providerResponseDeadlineUtc = new Date(deadlineMs).toISOString();
 
     const appointmentNumber = `CITA-${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    // Transactional create
+    const newAppointmentRef = doc(collection(db, 'appointments'));
     const newAppointment: Appointment = {
-      id: `app-${Date.now()}`,
+      id: newAppointmentRef.id,
       appointmentNumber,
       serviceId: service.id,
       serviceName: service.name,
@@ -868,8 +896,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerNotes: data.customerNotes || '',
       customerAddress: data.customerAddress || '',
       modality: appointmentModality,
-      travelDistanceKm: appointmentModality === 'domicilio' && servObj ? servObj.maxHomeZoneKm : undefined,
-      travelSurcharge: appointmentModality === 'domicilio' && servObj ? servObj.travelSurcharge : 0,
+      travelDistanceKm: (appointmentModality === 'domicilio' && servObj) ? servObj.maxHomeZoneKm : 0,
+      travelSurcharge: (appointmentModality === 'domicilio' && servObj) ? servObj.travelSurcharge : 0,
       priceType: servObj ? servObj.priceType : 'fijo',
       startTimeUtc: startDate.toISOString(),
       endTimeUtc: endDate.toISOString(),
@@ -881,19 +909,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
 
+    await runTransaction(db, async (transaction) => {
+      transaction.set(newAppointmentRef, newAppointment);
+      // Notification
+      const notifRef = doc(collection(db, 'notifications'));
+      transaction.set(notifRef, {
+        id: notifRef.id,
+        userId: data.providerId, // Notify provider
+        message: `Nueva cita: ${data.customerName} para ${service.name} el ${data.dateStr} a las ${data.timeStr}`,
+        type: 'appointment_created',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    });
+
     setAppointments(prev => [newAppointment, ...prev]);
-    saveAppointmentFirestore(newAppointment).catch(err => console.warn('Firestore saveAppointment error:', err));
     return newAppointment;
   };
 
-  const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
-    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-    updateAppointmentStatusFirestore(id, status).catch(err => console.warn('Firestore updateAppointmentStatus error:', err));
-  };
+  const cancelAppointment = async (id: string) => {
+    const app = appointments.find(a => a.id === id);
+    if (!app) throw new Error('Cita no encontrada');
 
-  const deleteAppointment = (id: string) => {
-    setAppointments(prev => prev.filter(a => a.id !== id));
-    deleteAppointmentFirestore(id).catch(() => {});
+    const now = new Date();
+    const startTime = new Date(app.startTimeUtc);
+    const diffHours = (startTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    if (diffHours < (app.minCancellationHours || 4)) {
+      throw new Error(`No se puede cancelar con menos de ${app.minCancellationHours || 4} horas de anticipación.`);
+    }
+
+    await runTransaction(db, async (transaction) => {
+      const appRef = doc(db, 'appointments', id);
+      transaction.update(appRef, { status: 'cancelada' });
+      
+      const notifRef = doc(collection(db, 'notifications'));
+      transaction.set(notifRef, {
+        id: notifRef.id,
+        userId: app.providerId,
+        message: `Cita cancelada: ${app.appointmentNumber}`,
+        type: 'appointment_cancelled',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    });
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'cancelada' } : a));
   };
 
   const getAvailableSlotsForDate = (
@@ -968,7 +1028,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const now = new Date();
-    const minNoticeTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const minNoticeHours = ('minNoticeHours' in service && typeof service.minNoticeHours === 'number') ? service.minNoticeHours : 2;
+    const minNoticeTime = new Date(now.getTime() + minNoticeHours * 60 * 60 * 1000);
 
     const slots: string[] = [];
 
@@ -984,7 +1045,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const appEnd = new Date(app.endTimeUtc);
         const appStartMin = appStart.getHours() * 60 + appStart.getMinutes();
         const appEndMin = appEnd.getHours() * 60 + appEnd.getMinutes();
-        return !(slotEndMinutes + buffer <= appStartMin || currentMinutes >= appEndMin);
+        return !(slotEndMinutes <= appStartMin || currentMinutes >= appEndMin);
       });
 
       const slotDateTime = new Date(year, month - 1, day, slotStartH, slotStartM);
@@ -1154,38 +1215,121 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auth / Current User
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
-    const savedRole = localStorage.getItem(STORAGE_KEYS.ROLE) as UserRole;
     const savedUser = localStorage.getItem('bl_current_user_profile');
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
-        if (parsed && parsed.name && parsed.name.toLowerCase().includes('mariana')) {
-          localStorage.removeItem('bl_current_user_profile');
-        } else if (parsed && typeof parsed === 'object') {
+        if (parsed && typeof parsed === 'object') {
+          const isAuthorized = parsed.email && isUserAdminEmail(parsed.email);
           return {
-            role: savedRole === 'admin' ? 'admin' : 'client',
+            role: isAuthorized && parsed.role === 'admin' ? 'admin' : 'client',
             name: parsed.name || '',
             phone: parsed.phone || '',
             address: parsed.address || '',
+            email: parsed.email,
+            uid: parsed.uid,
+            photoUrl: parsed.photoUrl,
+            isLoggedIn: Boolean(parsed.isLoggedIn),
+            authProvider: parsed.authProvider || 'guest',
           };
         }
       } catch (e) {}
     }
     return {
-      role: savedRole === 'admin' ? 'admin' : 'client',
-      name: savedRole === 'admin' ? 'Gerente Propietario' : '',
+      role: 'client',
+      name: '',
       phone: '',
       address: '',
+      isLoggedIn: false,
+      authProvider: 'guest',
     };
   });
 
+  const isAdminUser = Boolean(
+    currentUser.isLoggedIn && (isUserAdminEmail(currentUser.email) || currentUser.role === 'admin')
+  );
+
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const clearAuthError = () => setAuthError(null);
+
+  // Subscribe to real-time Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          const profile = await getUserProfileFirestore(fbUser.uid);
+          const isEmailAdmin = isUserAdminEmail(fbUser.email);
+          const isDbAdmin = profile?.role === 'admin';
+          const isAuthorizedAdmin = isEmailAdmin || isDbAdmin;
+
+          // If authorized admin, preserve their preferred view (admin or client preview), default to 'admin'
+          // If NOT an authorized admin, strictly force role to 'client'
+          const savedRole = localStorage.getItem(STORAGE_KEYS.ROLE) as UserRole;
+          const assignedRole: UserRole = isAuthorizedAdmin
+            ? (savedRole === 'client' ? 'client' : 'admin')
+            : 'client';
+
+          setCurrentUser((prev) => {
+            const updated: CurrentUser = {
+              role: assignedRole,
+              name: profile?.displayName || fbUser.displayName || prev.name || (isAuthorizedAdmin ? 'Administrador' : 'Cliente'),
+              email: fbUser.email || '',
+              phone: profile?.phone || fbUser.phoneNumber || prev.phone || '',
+              address: profile?.address || prev.address || '',
+              uid: fbUser.uid,
+              photoUrl: fbUser.photoURL || profile?.photoURL || undefined,
+              isLoggedIn: true,
+              authProvider: fbUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
+            };
+            try {
+              localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
+              localStorage.setItem(STORAGE_KEYS.ROLE, assignedRole);
+            } catch (_) {}
+            return updated;
+          });
+        } catch (err) {
+          console.warn('Error synchronizing user profile:', err);
+        }
+      } else {
+        // Logged out / guest - guests are ALWAYS 'client', no admin bypass
+        setCurrentUser(() => {
+          const updated: CurrentUser = {
+            role: 'client',
+            name: '',
+            phone: '',
+            address: '',
+            email: undefined,
+            uid: undefined,
+            photoUrl: undefined,
+            isLoggedIn: false,
+            authProvider: 'guest',
+          };
+          try {
+            localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
+            localStorage.setItem(STORAGE_KEYS.ROLE, 'client');
+          } catch (_) {}
+          return updated;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const switchRole = (role: UserRole) => {
+    // Strictly prevent non-admins from switching to admin
+    const canAccessAdmin = currentUser.isLoggedIn && (isUserAdminEmail(currentUser.email) || currentUser.role === 'admin');
+    if (role === 'admin' && !canAccessAdmin) {
+      console.warn('Acceso denegado: Solo el administrador asignado puede acceder al panel gerencial.');
+      return;
+    }
     localStorage.setItem(STORAGE_KEYS.ROLE, role);
     setCurrentUser((prev) => {
       const updated = {
         ...prev,
         role,
-        name: role === 'admin' ? 'Gerente Propietario' : (prev.name.toLowerCase().includes('mariana') ? '' : prev.name),
       };
       try {
         localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
@@ -1200,9 +1344,132 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
       } catch (_) {}
+      // If user is authenticated in Firebase, sync changes to their Firestore profile
+      if (prev.uid) {
+        upsertUserProfileFirestore({
+          uid: prev.uid,
+          displayName: updated.name,
+          phone: updated.phone,
+          address: updated.address,
+        }).catch((e) => console.warn('Sync profile Firestore error:', e));
+      }
       return updated;
     });
   };
+
+  const loginWithGoogleHandler = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await loginWithGoogle();
+      setIsAuthModalOpen(false);
+    } catch (err: any) {
+      console.error('Google login error:', err);
+      let msg = 'No se pudo iniciar sesión con Google.';
+      if (err.code === 'auth/popup-closed-by-user') {
+        msg = 'La ventana de inicio de sesión fue cerrada antes de completar el acceso.';
+      } else if (err.code === 'auth/popup-blocked') {
+        msg = 'El navegador bloqueó la ventana emergente. Por favor permite las ventanas emergentes.';
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        msg = 'Solicitud cancelada.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setAuthError(msg);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const loginWithEmailHandler = async (email: string, pass: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await loginWithEmail(email, pass);
+      setIsAuthModalOpen(false);
+    } catch (err: any) {
+      console.error('Email login error:', err);
+      let msg = 'Error al iniciar sesión.';
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
+        msg = 'Correo electrónico o contraseña incorrectos.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'El formato del correo electrónico no es válido.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Demasiados intentos fallidos. Intenta más tarde o restablece tu contraseña.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setAuthError(msg);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const registerWithEmailHandler = async (email: string, pass: string, name: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await registerWithEmail(email, pass, name);
+      setIsAuthModalOpen(false);
+    } catch (err: any) {
+      console.error('Email register error:', err);
+      let msg = 'Error al crear la cuenta.';
+      if (err.code === 'auth/email-already-in-use') {
+        msg = 'Ya existe una cuenta registrada con este correo electrónico.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'La contraseña debe tener al menos 6 caracteres.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'El correo electrónico ingresado no es válido.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setAuthError(msg);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const sendPasswordResetEmailHandler = async (email: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await sendPasswordReset(email);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      let msg = 'No se pudo enviar el correo de recuperación.';
+      if (err.code === 'auth/user-not-found') {
+        msg = 'No se encontró ninguna cuenta registrada con este correo.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'El correo electrónico no es válido.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setAuthError(msg);
+      throw err;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const logoutHandler = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await logoutUser();
+    } catch (err: any) {
+      console.error('Logout error:', err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -1338,8 +1605,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteOrder,
         clearAllOrders,
         currentUser,
+        isAdminUser,
         switchRole,
         updateCurrentUser,
+        loginWithGoogle: loginWithGoogleHandler,
+        loginWithEmail: loginWithEmailHandler,
+        registerWithEmail: registerWithEmailHandler,
+        sendPasswordResetEmail: sendPasswordResetEmailHandler,
+        logout: logoutHandler,
+        authLoading,
+        authError,
+        clearAuthError,
         cart,
         addToCart,
         updateCartItemQuantity,
@@ -1377,6 +1653,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createAppointment,
         updateAppointmentStatus,
         deleteAppointment,
+        cancelAppointment,
         getAvailableSlotsForDate,
       }}
     >

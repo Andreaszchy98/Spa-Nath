@@ -92,7 +92,7 @@
         "currencyCode": { "type": "string", "maxLength": 10 },
         "phone": { "type": "string", "maxLength": 50 },
         "address": { "type": "string", "maxLength": 300 },
-        "currentTheme": { "type": "string", "enum": ["default", "rojo", "cafe", "naranja"] },
+        "currentTheme": { "type": "string", "enum": ["default", "rojo", "cafe", "naranja", "rosa", "crema"] },
         "enableStockControl": { "type": "boolean" },
         "licenseCode": { "type": "string", "maxLength": 100 }
       },
@@ -124,9 +124,74 @@
         "available": { "type": "boolean" }
       },
       "required": ["id", "name", "durationMinutes", "modality", "confirmationType"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Customer spa appointment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "appointmentNumber": { "type": "string", "maxLength": 50 },
+        "serviceId": { "type": "string", "maxLength": 128 },
+        "serviceName": { "type": "string", "maxLength": 200 },
+        "providerId": { "type": "string", "maxLength": 128 },
+        "providerName": { "type": "string", "maxLength": 200 },
+        "customerName": { "type": "string", "maxLength": 200 },
+        "customerPhone": { "type": "string", "maxLength": 50 },
+        "customerNotes": { "type": "string", "maxLength": 1000 },
+        "customerAddress": { "type": "string", "maxLength": 300 },
+        "modality": { "type": "string", "enum": ["local", "domicilio"] },
+        "travelDistanceKm": { "type": "number" },
+        "travelSurcharge": { "type": "number" },
+        "priceType": { "type": "string", "enum": ["fijo", "desde", "a_cotizar"] },
+        "startTimeUtc": { "type": "string", "maxLength": 50 },
+        "endTimeUtc": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["pendiente", "confirmada", "completada", "cancelada"] },
+        "totalPrice": { "type": "number" },
+        "confirmationType": { "type": "string", "enum": ["automatica", "aprobacion", "hibrida"] },
+        "providerResponseDeadlineUtc": { "type": "string", "maxLength": 50 },
+        "minCancellationHours": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "appointmentNumber", "serviceId", "providerId", "customerName", "customerPhone", "startTimeUtc", "endTimeUtc", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System notification for users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "type": { "type": "string", "enum": ["appointment_created", "appointment_updated", "appointment_cancelled"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "message", "type", "read", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile for authentication and contact details",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 200 },
+        "displayName": { "type": "string", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 2000 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "address": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "enum": ["admin", "client"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "email"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Registered client and admin profiles"
+    },
     "/products/{productId}": {
       "schema": "Product",
       "description": "Store products with recipe links and option groups"
@@ -150,6 +215,14 @@
     "/business_profiles/{profileId}": {
       "schema": "BusinessProfile",
       "description": "Branding and business identity settings"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Customer appointments"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
     }
   }
 }

@@ -1,5 +1,16 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  sendPasswordResetEmail,
+  User as FirebaseUser,
+} from 'firebase/auth';
 import {
   getFirestore,
   doc,
@@ -9,9 +20,23 @@ import {
   setDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
+  getDoc,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { Product, Ingredient, Order, PromoBanner, BusinessProfile, Provider, DaySchedule, ScheduleException, Appointment, Service } from './types';
+import {
+  Product,
+  Ingredient,
+  Order,
+  PromoBanner,
+  BusinessProfile,
+  Provider,
+  DaySchedule,
+  ScheduleException,
+  Appointment,
+  Service,
+  UserProfile,
+} from './types';
 
 // 1. Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -627,4 +652,126 @@ export async function deleteServiceFirestore(serviceId: string): Promise<void> {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
+
+// ============================================================================
+// USER PROFILES & FIREBASE AUTH SERVICES
+// ============================================================================
+
+export async function getUserProfileFirestore(uid: string): Promise<UserProfile | null> {
+  const path = `users/${uid}`;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (snap.exists()) {
+      return snap.data() as UserProfile;
+    }
+    return null;
+  } catch (error) {
+    console.warn('getUserProfileFirestore error:', error);
+    return null;
+  }
+}
+
+export async function upsertUserProfileFirestore(profile: Partial<UserProfile> & { uid: string }): Promise<void> {
+  const path = `users/${profile.uid}`;
+  try {
+    const cleaned = cleanObject({
+      ...profile,
+      updatedAt: new Date().toISOString(),
+    });
+    await setDoc(doc(db, 'users', profile.uid), cleaned, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+// Administrator authorized emails
+export const ADMIN_EMAILS = [
+  'jorgeandres980706@gmail.com',
+];
+
+export function isUserAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.some((adminEmail) => adminEmail.toLowerCase() === email.toLowerCase().trim());
+}
+
+// Provider instance
+export const googleAuthProvider = new GoogleAuthProvider();
+googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
+
+export async function loginWithGoogle(): Promise<FirebaseUser> {
+  try {
+    const result = await signInWithPopup(auth, googleAuthProvider);
+    const user = result.user;
+    // Check if user already exists in Firestore or save initial data
+    const existing = await getUserProfileFirestore(user.uid);
+    const isAdmin = isUserAdminEmail(user.email) || existing?.role === 'admin';
+    await upsertUserProfileFirestore({
+      uid: user.uid,
+      email: user.email || '',
+      displayName: user.displayName || existing?.displayName || (isAdmin ? 'Administrador' : 'Cliente'),
+      photoURL: user.photoURL || existing?.photoURL || '',
+      phone: existing?.phone || user.phoneNumber || '',
+      address: existing?.address || '',
+      role: isAdmin ? 'admin' : 'client',
+      createdAt: existing?.createdAt || new Date().toISOString(),
+    });
+    return user;
+  } catch (error: any) {
+    console.error('Error al iniciar sesión con Google:', error);
+    throw error;
+  }
+}
+
+export async function loginWithEmail(email: string, pass: string): Promise<FirebaseUser> {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    return result.user;
+  } catch (error: any) {
+    console.error('Error al iniciar sesión con correo:', error);
+    throw error;
+  }
+}
+
+export async function registerWithEmail(email: string, pass: string, displayName: string): Promise<FirebaseUser> {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    if (displayName.trim()) {
+      await updateProfile(result.user, { displayName: displayName.trim() });
+    }
+    const isAdmin = isUserAdminEmail(result.user.email);
+    await upsertUserProfileFirestore({
+      uid: result.user.uid,
+      email: result.user.email || email,
+      displayName: displayName.trim() || (isAdmin ? 'Administrador' : 'Cliente'),
+      role: isAdmin ? 'admin' : 'client',
+      createdAt: new Date().toISOString(),
+    });
+    return result.user;
+  } catch (error: any) {
+    console.error('Error al registrar usuario:', error);
+    throw error;
+  }
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error('Error al enviar correo de recuperación:', error);
+    throw error;
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  try {
+    await signOut(auth);
+  } catch (error: any) {
+    console.error('Error al cerrar sesión:', error);
+    throw error;
+  }
+}
+
+export { onAuthStateChanged };
+export type { FirebaseUser };
+
 
