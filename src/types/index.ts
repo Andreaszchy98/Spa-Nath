@@ -280,9 +280,19 @@ export interface CurrentUser {
   address: string;
   uid?: string;
   email?: string;
+  emailVerified?: boolean;
   photoUrl?: string;
   isLoggedIn?: boolean;
   authProvider?: 'google' | 'password' | 'guest';
+}
+
+export interface BusySlot {
+  id: string;
+  providerId: string;
+  startTimeUtc: string;
+  endTimeUtc: string;
+  appointmentId: string;
+  customerUid: string | null;
 }
 
 export interface UserProfile {

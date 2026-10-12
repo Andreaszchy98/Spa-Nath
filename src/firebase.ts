@@ -43,6 +43,7 @@ import {
   Service,
   UserProfile,
   AppNotification,
+  BusySlot,
 } from './types';
 
 // 1. Initialize Firebase
@@ -650,6 +651,51 @@ export async function deleteAppointmentFirestore(appId: string): Promise<void> {
   }
 }
 
+// --- Busy Slots ---
+export function subscribeBusySlots(
+  onSuccess: (busySlots: BusySlot[]) => void,
+  onError?: (err: Error) => void
+) {
+  const path = 'busy_slots';
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const items: BusySlot[] = [];
+      snapshot.forEach((docSnap) => items.push({ ...docSnap.data(), id: docSnap.id } as BusySlot));
+      onSuccess(items);
+    },
+    (err) => {
+      if (onError) onError(err);
+      try { handleFirestoreError(err, OperationType.LIST, path); } catch (_) {}
+    }
+  );
+}
+
+export async function upsertBusySlotFirestore(slot: BusySlot): Promise<void> {
+  const path = `busy_slots/${slot.id}`;
+  try {
+    const cleaned = cleanObject({
+      providerId: slot.providerId,
+      startTimeUtc: slot.startTimeUtc,
+      endTimeUtc: slot.endTimeUtc,
+      appointmentId: slot.appointmentId,
+      customerUid: slot.customerUid !== undefined ? slot.customerUid : null,
+    });
+    await setDoc(doc(db, 'busy_slots', slot.id), cleaned);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteBusySlotFirestore(slotId: string): Promise<void> {
+  const path = `busy_slots/${slotId}`;
+  try {
+    await deleteDoc(doc(db, 'busy_slots', slotId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 // --- Services ---
 export function subscribeServices(onSuccess: (services: Service[]) => void, onError?: (err: Error) => void) {
   const path = 'services';
@@ -825,9 +871,8 @@ export async function loginWithGoogle(): Promise<FirebaseUser> {
   try {
     const result = await signInWithPopup(auth, googleAuthProvider);
     const user = result.user;
-    // Check if user already exists in Firestore or save initial data
     const existing = await getUserProfileFirestore(user.uid);
-    const isAdmin = isUserAdminEmail(user.email) || existing?.role === 'admin';
+    const isAdmin = Boolean(user.emailVerified && isUserAdminEmail(user.email));
     await upsertUserProfileFirestore({
       uid: user.uid,
       email: user.email || '',
@@ -861,7 +906,7 @@ export async function registerWithEmail(email: string, pass: string, displayName
     if (displayName.trim()) {
       await updateProfile(result.user, { displayName: displayName.trim() });
     }
-    const isAdmin = isUserAdminEmail(result.user.email);
+    const isAdmin = Boolean(result.user.emailVerified && isUserAdminEmail(result.user.email));
     await upsertUserProfileFirestore({
       uid: result.user.uid,
       email: result.user.email || email,

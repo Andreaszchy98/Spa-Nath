@@ -12,8 +12,10 @@ import {
   ShieldCheck,
   Calendar,
   Sparkles,
+  Settings,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { getTheme } from '../../utils/themes';
 
 export const CustomerProfileView: React.FC = () => {
   const {
@@ -31,12 +33,15 @@ export const CustomerProfileView: React.FC = () => {
     theme,
   } = useApp();
 
+  const currentTheme = getTheme(theme);
+
   const [name, setName] = useState(currentUser.name || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
   const [address, setAddress] = useState(currentUser.address || '');
   const [isSaved, setIsSaved] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -133,7 +138,7 @@ export const CustomerProfileView: React.FC = () => {
         </div>
       ) : (
         /* Guest Banner: Invites to log in without blocking navigation */
-        <div className="bg-linear-to-r from-slate-900 via-neutral-900 to-slate-800 text-white rounded-3xl p-5 sm:p-6 shadow-md border border-slate-800 space-y-4">
+        <div className={`${currentTheme.accentBgClass} text-white rounded-3xl p-5 sm:p-6 shadow-md border border-white/20 space-y-4`}>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20">
@@ -141,11 +146,8 @@ export const CustomerProfileView: React.FC = () => {
                 <span>Navegando como Invitado</span>
               </span>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-tight pt-1">
-                ¿Deseas guardar tus pedidos y citas?
+                Inicia sesión o regístrate
               </h2>
-              <p className="text-xs text-slate-300 max-w-md leading-relaxed">
-                Inicia sesión con Google o con tu correo para acceder a tu historial de compras y citas desde cualquier dispositivo. Si lo prefieres, puedes seguir como invitado.
-              </p>
             </div>
 
             <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-white/10 border border-white/20 items-center justify-center text-white shrink-0">
@@ -245,144 +247,144 @@ export const CustomerProfileView: React.FC = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4 text-xs">
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Nombre Completo *
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej. Juan Pérez"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-              />
+        {currentUser.isLoggedIn ? (
+          <form onSubmit={handleSave} className="space-y-4 text-xs">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">
+                Nombre Completo *
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej. Juan Pérez"
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
+                />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Teléfono / WhatsApp *
-            </label>
-            <div className="relative">
-              <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+52 55 1234 5678"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-              />
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">
+                Teléfono / WhatsApp *
+              </label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+52 55 1234 5678"
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Te contactaremos a este número para confirmar tus citas y cuando tus pedidos estén listos.
+              </p>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Te contactaremos a este número para confirmar tus citas y cuando tus pedidos estén listos.
-            </p>
-          </div>
 
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">
-              Dirección o Referencia de Domicilio
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <textarea
-                rows={2}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Calle, número, colonia o referencias para tus servicios o pedidos..."
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-              />
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">
+                Dirección o Referencia de Domicilio
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <textarea
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Calle, número, colonia o referencias para tus servicios o pedidos..."
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="pt-2 flex items-center justify-between gap-3">
-            {isSaved ? (
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>¡Datos guardados con éxito!</span>
-              </span>
-            ) : (
-              <span className="text-[11px] text-slate-400">
-                {currentUser.isLoggedIn
-                  ? 'Sincronizado en la nube con tu cuenta de Firebase.'
-                  : 'Guardado en tu dispositivo para tus compras como invitado.'}
-              </span>
-            )}
+            <div className="pt-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {isSaved && (
+                  <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>¡Datos guardados con éxito!</span>
+                  </span>
+                )}
 
-            <button
-              type="submit"
-              className="py-2.5 px-5 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center gap-2 active:scale-95 bg-slate-900 text-white hover:bg-slate-800"
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Perfil</span>
-            </button>
-          </div>
-        </form>
-      </div>
+                {currentUser.isLoggedIn && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                      className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-200/60"
+                      title="Ajustes"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Ajustes</span>
+                    </button>
 
-      {/* 4. "Mis Datos" Transparency Section */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-          <h3 className="font-extrabold text-slate-900 text-base tracking-tight flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Mis Datos Almacenados (Privacidad)</span>
-          </h3>
-        </div>
-        <p className="text-xs text-slate-600">
-          De conformidad con las normativas de protección de datos, aquí puedes ver la información que almacenamos asociada a tu perfil:
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Nombre y Contacto</span>
-            <p className="font-bold text-slate-800">{currentUser.name || name || 'No especificado'}</p>
-            <p className="text-slate-500">{currentUser.email || 'Sin correo'} · {phone || currentUser.phone || 'Sin teléfono'}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Dirección Registrada</span>
-            <p className="font-bold text-slate-800">{address || currentUser.address || 'No especificada'}</p>
-            <p className="text-slate-500">Rol: {currentUser.role === 'admin' ? 'Administrador' : 'Cliente'}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Actividad en la App</span>
-            <p className="font-bold text-slate-800">{clientAppointments.length} citas · {clientOrders.length} pedidos</p>
-            <p className="text-slate-500">Método de acceso: {currentUser.authProvider || 'invitado'}</p>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Privacidad y Consentimiento</span>
-            <p className="font-bold text-emerald-700">✓ Aviso de Privacidad Aceptado</p>
-            <p className="text-slate-500">Tratamiento de datos para citas y pedidos activo.</p>
-          </div>
-        </div>
-      </div>
+                    {showSettingsMenu && (
+                      <div className="absolute left-0 bottom-full mb-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-30 space-y-1 text-left animate-in fade-in zoom-in-95">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1">Ajustes</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDeleteConfirm(true);
+                            setShowSettingsMenu(false);
+                            setDeleteError(null);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-2"
+                        >
+                          Eliminar mi cuenta
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
-      {/* 5. "Eliminar mi cuenta" Section */}
-      {currentUser.isLoggedIn && (
-        <div className="bg-rose-50/60 rounded-3xl border border-rose-200 p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="border-b border-rose-200/60 pb-3 flex items-center justify-between">
-            <h3 className="font-extrabold text-rose-950 text-base tracking-tight">
-              Zona de Peligro · Eliminar Mi Cuenta
-            </h3>
-          </div>
-          <p className="text-xs text-rose-900 leading-relaxed">
-            Eliminar tu cuenta borrará permanentemente tu usuario, tus datos personales de la base de datos y tu acceso en Firebase Auth. Tus citas futuras serán canceladas. Esta acción no se puede deshacer.
+              <button
+                type="submit"
+                className={`py-2.5 px-5 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center gap-2 active:scale-95 ${currentTheme.buttonClass}`}
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar Perfil</span>
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="text-sm text-slate-500 italic p-4 text-center">
+            Inicia sesión para gestionar tus datos personales y configuración de cuenta.
           </p>
+        )}
+      </div>
 
-          {!showDeleteConfirm ? (
-            <button
-              type="button"
-              onClick={() => {
-                setShowDeleteConfirm(true);
-                setDeleteError(null);
-              }}
-              className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
-            >
-              Eliminar mi cuenta
-            </button>
-          ) : (
+      {/* Delete Account Confirmation Modal Popup */}
+      {currentUser.isLoggedIn && showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 max-w-md w-full space-y-4 text-left animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-black text-slate-900 text-base tracking-tight flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">⚠️</span>
+                <span>Confirmar Eliminación de Cuenta</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletePassword('');
+                  setDeleteError(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              ¿Estás totalmente segura de que deseas eliminar tu cuenta? Esta acción no se puede deshacer y borrará permanentemente tus datos de acceso.
+            </p>
+
             <form onSubmit={async (e) => {
               e.preventDefault();
               setDeleteError(null);
@@ -394,21 +396,18 @@ export const CustomerProfileView: React.FC = () => {
                 setDeleteError(err?.message || 'Error al eliminar la cuenta. Verifica tu contraseña.');
                 setDeleting(false);
               }
-            }} className="p-4 bg-white rounded-2xl border border-rose-300 space-y-3 text-xs">
-              <p className="font-bold text-rose-900">
-                Confirmación requerida en dos pasos: ¿Estás totalmente segura de que deseas eliminar tu cuenta?
-              </p>
+            }} className="space-y-4 text-xs pt-1">
 
               {currentUser.authProvider === 'password' && (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Ingresa tu contraseña actual para confirmar:</label>
+                  <label className="font-bold text-slate-700 block mb-1">Ingresa tu contraseña actual:</label>
                   <input
                     type="password"
                     required
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
                   />
                 </div>
               )}
@@ -419,7 +418,7 @@ export const CustomerProfileView: React.FC = () => {
                 </p>
               )}
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2.5 pt-2 justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -428,43 +427,21 @@ export const CustomerProfileView: React.FC = () => {
                     setDeleteError(null);
                   }}
                   disabled={deleting}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold bg-slate-50 hover:bg-slate-100"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold bg-white hover:bg-slate-100 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={deleting}
-                  className="px-4 py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold shadow-xs flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs flex items-center gap-2 transition-all active:scale-95"
                 >
-                  {deleting && <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full" />}
-                  <span>Sí, eliminar mi cuenta definitivamente</span>
+                  {deleting && <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />}
+                  <span>Sí, eliminar mi cuenta</span>
                 </button>
               </div>
             </form>
-          )}
-        </div>
-      )}
-
-      {/* Authorized Admin Section (Only shown if current logged-in user is the administrator) */}
-      {isAdminUser && (
-        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-extrabold text-xs text-indigo-950">Acceso Administrativo Habilitado</p>
-              <p className="text-[11px] text-indigo-700">Sesión iniciada como administrador ({currentUser.email})</p>
-            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => switchRole('admin')}
-            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all active:scale-95"
-          >
-            Ir al Panel de Gerencia
-          </button>
         </div>
       )}
     </div>

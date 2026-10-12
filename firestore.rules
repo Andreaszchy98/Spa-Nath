@@ -8,12 +8,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() &&
-             request.auth.token.email != null &&
-             (
-               request.auth.token.email.lower() == 'jorgeandres980706@gmail.com' ||
-               (request.auth.token.email_verified == true && request.auth.token.email.lower() in ['jorgeandres980706@gmail.com'])
-             );
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in ['jorgeandres980706@gmail.com'];
     }
 
     function isOwner() {
@@ -167,7 +164,28 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role == 'client');
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','uid']));
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    // Busy slots collection
+    match /busy_slots/{slotId} {
+      allow get, list: if true;
+      allow create: if isValidId(slotId)
+        && request.resource.data.keys().hasOnly(['providerId','startTimeUtc','endTimeUtc','appointmentId','customerUid'])
+        && request.resource.data.providerId is string
+        && request.resource.data.startTimeUtc is string
+        && request.resource.data.endTimeUtc is string
+        && (!('customerUid' in request.resource.data) || request.resource.data.customerUid == null
+            || request.resource.data.customerUid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin()
+        || (isSignedIn() && 'customerUid' in resource.data && resource.data.customerUid == request.auth.uid);
     }
 
     // Notifications collection: Admin or Recipient read; Create by admin, user to admin, or to self; Update read flag; Delete

@@ -35,6 +35,7 @@ import {
   AppNotification,
   NotificationType,
   PushPreferences,
+  BusySlot,
 } from '../types';
 import { getTheme, THEMES } from '../utils/themes';
 import {
@@ -50,6 +51,9 @@ import {
   subscribeAppointments,
   subscribeServices,
   subscribeNotifications,
+  subscribeBusySlots,
+  upsertBusySlotFirestore,
+  deleteBusySlotFirestore,
   upsertProductFirestore,
   deleteProductFirestore,
   upsertIngredientFirestore,
@@ -618,6 +622,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [orders]);
 
   const createOrder = (orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt'>): Order => {
+    if (!currentUser.isLoggedIn) {
+      setIsAuthModalOpen(true);
+      throw new Error('Debes iniciar sesión para realizar pedidos.');
+    }
     const orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
     const newOrder: Order = {
       ...orderData,
@@ -789,6 +797,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateAppointmentStatus = (id: string, status: AppointmentStatus) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     updateAppointmentStatusFirestore(id, status).catch((err) => console.warn('Firestore updateAppointmentStatus error:', err));
+    if (status === 'cancelada') {
+      deleteBusySlotFirestore(id).catch((err) => console.warn('Firestore deleteBusySlot error:', err));
+    }
     const target = appointments.find((a) => a.id === id);
     if (target) {
       if (status === 'confirmada' || status === 'completada') {
@@ -809,6 +820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteAppointment = async (id: string) => {
     setAppointments((prev) => prev.filter((a) => a.id !== id));
     await deleteAppointmentFirestore(id).catch((err) => console.warn('Firestore deleteAppointment error:', err));
+    await deleteBusySlotFirestore(id).catch((err) => console.warn('Firestore deleteBusySlot error:', err));
   };
 
   const markOrderPaymentReceived = (orderId: string, received: boolean) => {
@@ -1199,6 +1211,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteExceptionFirestore(id).catch(() => {});
   };
 
+  const [busySlots, setBusySlots] = useState<BusySlot[]>([]);
+
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('bl_appointments_list');
     if (saved) {
@@ -1229,6 +1243,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     privacyAcceptedAt?: string;
     healthConsent?: boolean;
   }): Promise<Appointment> => {
+    if (!currentUser.isLoggedIn) {
+      setIsAuthModalOpen(true);
+      throw new Error('Debes iniciar sesión para agendar citas.');
+    }
     const foundService =
       services.find((s) => s.id === data.serviceId) ||
       products.find((p) => p.id === data.serviceId) ||
@@ -1361,6 +1379,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       await setDoc(newAppointmentRef, cleanedAppointment);
+      const busySlot: BusySlot = {
+        id: newAppointment.id,
+        providerId: newAppointment.providerId,
+        startTimeUtc: newAppointment.startTimeUtc,
+        endTimeUtc: newAppointment.endTimeUtc,
+        appointmentId: newAppointment.id,
+        customerUid: newAppointment.customerUid || null,
+      };
+      await upsertBusySlotFirestore(busySlot);
     } catch (saveError) {
       console.error('Error al guardar cita en Firestore:', saveError);
       throw saveError;
@@ -1415,6 +1442,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAppointments((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status: 'cancelada' } : a))
     );
+
+    await deleteBusySlotFirestore(id).catch(() => {});
 
     // Send push notification for cancellation: gerente vs clienta
     const isActingAsAdmin = isAdminUser || currentUser.role === 'admin';
@@ -1502,10 +1531,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       breakEndMin = bh2 * 60 + bm2;
     }
 
-    const dayAppointments = appointments.filter(app => {
-      if (app.providerId !== providerId || app.status === 'cancelada') return false;
-      const appDate = new Date(app.startTimeUtc);
-      return appDate.getFullYear() === year && appDate.getMonth() === month - 1 && appDate.getDate() === day;
+    const providerBusySlots = busySlots.filter(slot => {
+      if (slot.providerId !== providerId) return false;
+      const slotStart = new Date(slot.startTimeUtc);
+      return slotStart.getFullYear() === year && slotStart.getMonth() === month - 1 && slotStart.getDate() === day;
     });
 
     const now = new Date();
@@ -1521,12 +1550,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const overlapsBreak = breakStartMin !== -1 && !(slotEndMinutes <= breakStartMin || currentMinutes >= breakEndMin);
 
-      const overlapsApp = dayAppointments.some(app => {
-        const appStart = new Date(app.startTimeUtc);
-        const appEnd = new Date(app.endTimeUtc);
-        const appStartMin = appStart.getHours() * 60 + appStart.getMinutes();
-        const appEndMin = appEnd.getHours() * 60 + appEnd.getMinutes();
-        return !(slotEndMinutes <= appStartMin || currentMinutes >= appEndMin);
+      const overlapsApp = providerBusySlots.some(slot => {
+        const slotStart = new Date(slot.startTimeUtc);
+        const slotEnd = new Date(slot.endTimeUtc);
+        const slotStartMin = slotStart.getHours() * 60 + slotStart.getMinutes();
+        const slotEndMin = slotEnd.getHours() * 60 + slotEnd.getMinutes();
+        return !(slotEndMinutes <= slotStartMin || currentMinutes >= slotEndMin);
       });
 
       const slotDateTime = new Date(year, month - 1, day, slotStartH, slotStartM);
@@ -1684,13 +1713,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(savedUser);
         if (parsed && typeof parsed === 'object') {
-          const isAuthorized = parsed.email && isUserAdminEmail(parsed.email);
+          const emailVerified = Boolean(parsed.emailVerified);
+          const isAuthorized = parsed.email && emailVerified && isUserAdminEmail(parsed.email);
           return {
             role: isAuthorized && parsed.role === 'admin' ? 'admin' : 'client',
             name: parsed.name || '',
             phone: parsed.phone || '',
             address: parsed.address || '',
             email: parsed.email,
+            emailVerified,
             uid: parsed.uid,
             photoUrl: parsed.photoUrl,
             isLoggedIn: Boolean(parsed.isLoggedIn),
@@ -1704,6 +1735,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name: '',
       phone: '',
       address: '',
+      emailVerified: false,
       isLoggedIn: false,
       authProvider: 'guest',
     };
@@ -1712,7 +1744,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authUid, setAuthUid] = useState<string | null | undefined>(undefined);
 
   const isAdminUser = Boolean(
-    currentUser.isLoggedIn && isUserAdminEmail(currentUser.email)
+    currentUser.isLoggedIn && currentUser.emailVerified && isUserAdminEmail(currentUser.email)
   );
 
   const [authLoading, setAuthLoading] = useState(false);
@@ -1727,10 +1759,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (fbUser) {
         try {
           const profile = await getUserProfileFirestore(fbUser.uid);
-          const isAuthorizedAdmin = isUserAdminEmail(fbUser.email);
+          const emailVerified = Boolean(fbUser.emailVerified);
+          const isAuthorizedAdmin = emailVerified && isUserAdminEmail(fbUser.email);
 
-          // If authorized admin, preserve their preferred view (admin or client preview), default to 'admin'
-          // If NOT an authorized admin, strictly force role to 'client'
           const savedRole = localStorage.getItem(STORAGE_KEYS.ROLE) as UserRole;
           const assignedRole: UserRole = isAuthorizedAdmin
             ? (savedRole === 'client' ? 'client' : 'admin')
@@ -1741,6 +1772,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               role: assignedRole,
               name: profile?.displayName || fbUser.displayName || prev.name || (isAuthorizedAdmin ? 'Administrador' : 'Cliente'),
               email: fbUser.email || '',
+              emailVerified,
               phone: profile?.phone || fbUser.phoneNumber || prev.phone || '',
               address: profile?.address || prev.address || '',
               uid: fbUser.uid,
@@ -1758,7 +1790,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn('Error synchronizing user profile:', err);
         }
       } else {
-        // Logged out / guest - guests are ALWAYS 'client', no admin bypass
         setCurrentUser(() => {
           const updated: CurrentUser = {
             role: 'client',
@@ -1766,6 +1797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             phone: '',
             address: '',
             email: undefined,
+            emailVerified: false,
             uid: undefined,
             photoUrl: undefined,
             isLoggedIn: false,
@@ -1831,6 +1863,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isManager ? true : false
     );
 
+    // Subscribe busy_slots for all sessions (no filter)
+    const unsubBusySlots = subscribeBusySlots(
+      (remoteSlots) => {
+        if (!isEffectMounted) return;
+        setBusySlots(remoteSlots);
+
+        if (isManager && appointments.length > 0) {
+          appointments.forEach(app => {
+            if (app.status !== 'cancelada') {
+              const exists = remoteSlots.some(b => b.appointmentId === app.id);
+              if (!exists) {
+                upsertBusySlotFirestore({
+                  id: app.id,
+                  providerId: app.providerId,
+                  startTimeUtc: app.startTimeUtc,
+                  endTimeUtc: app.endTimeUtc,
+                  appointmentId: app.id,
+                  customerUid: app.customerUid || null,
+                }).catch(() => {});
+              }
+            }
+          });
+        }
+      },
+      () => {}
+    );
+
     // 3. Notificaciones: gerente colección completa; clienta recipientUid == authUid
     let initialLoadDone = false;
     const unsubNotifs = subscribeNotifications(
@@ -1867,13 +1926,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isEffectMounted = false;
       unsubOrders();
       unsubAppointments();
+      unsubBusySlots();
       unsubNotifs();
     };
   }, [authUid, isAdminUser, currentUser.uid]);
 
   const switchRole = (role: UserRole) => {
-    // Strictly prevent non-admins from switching to admin
-    const canAccessAdmin = currentUser.isLoggedIn && isUserAdminEmail(currentUser.email);
+    const emailVerified = Boolean(currentUser.emailVerified);
+    const canAccessAdmin = currentUser.isLoggedIn && emailVerified && isUserAdminEmail(currentUser.email);
     if (role === 'admin' && !canAccessAdmin) {
       console.warn('Acceso denegado: Solo el administrador asignado puede acceder al panel gerencial.');
       return;
