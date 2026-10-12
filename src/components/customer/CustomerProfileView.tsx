@@ -185,7 +185,7 @@ export const CustomerProfileView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsAuthModalOpen(true)}
-              className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all flex items-center gap-1.5 active:scale-95"
+              className="py-2.5 px-4 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold border border-white/30 transition-all flex items-center gap-1.5 active:scale-95"
             >
               <Mail className="w-4 h-4 text-white" />
               <span>Entrar con Correo</span>

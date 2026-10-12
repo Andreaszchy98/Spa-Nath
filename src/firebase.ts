@@ -885,7 +885,9 @@ export async function loginWithGoogle(): Promise<FirebaseUser> {
     });
     return user;
   } catch (error: any) {
-    console.error('Error al iniciar sesión con Google:', error);
+    if (error.code !== 'auth/popup-closed-by-user') {
+      console.error('Error al iniciar sesión con Google:', error);
+    }
     throw error;
   }
 }
