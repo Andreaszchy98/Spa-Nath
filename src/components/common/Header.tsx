@@ -11,9 +11,11 @@ import {
   ChevronDown,
   Calendar,
   Store,
+  Bell,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuthModal } from './AuthModal';
+import { NotificationDrawer } from './NotificationDrawer';
 
 export const Header: React.FC = () => {
   const {
@@ -23,6 +25,9 @@ export const Header: React.FC = () => {
     switchRole,
     cartCount,
     setIsCartDrawerOpen,
+    unreadNotificationsCount,
+    isNotificationDrawerOpen,
+    setIsNotificationDrawerOpen,
     adminTab,
     setAdminTab,
     customerTab,
@@ -172,6 +177,23 @@ export const Header: React.FC = () => {
               </button>
             )}
 
+            {/* Notification Bell Button */}
+            <button
+              type="button"
+              onClick={() => setIsNotificationDrawerOpen(true)}
+              className="relative p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-1.5 active:scale-95 border border-white/15"
+              title="Centro de Notificaciones"
+              aria-label="Centro de Notificaciones"
+            >
+              <Bell className="w-4 h-4 text-white" />
+              <span className="hidden xs:inline text-xs font-semibold">Avisos</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
             {/* Login / Role Profile Button (opens popup modal) */}
             <button
               type="button"
@@ -306,6 +328,12 @@ export const Header: React.FC = () => {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* Notification Drawer Center */}
+      <NotificationDrawer
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setIsNotificationDrawerOpen(false)}
       />
     </>
   );

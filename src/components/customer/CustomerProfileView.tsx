@@ -27,6 +27,7 @@ export const CustomerProfileView: React.FC = () => {
     setIsAuthModalOpen,
     loginWithGoogle,
     logout,
+    deleteMyAccount,
     theme,
   } = useApp();
 
@@ -34,6 +35,11 @@ export const CustomerProfileView: React.FC = () => {
   const [phone, setPhone] = useState(currentUser.phone || '');
   const [address, setAddress] = useState(currentUser.address || '');
   const [isSaved, setIsSaved] = useState(false);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setName(currentUser.name || '');
@@ -56,17 +62,19 @@ export const CustomerProfileView: React.FC = () => {
   };
 
   // Orders statistics for this customer
-  const clientOrders = orders.filter(
-    (o) => (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name)
-  );
+  const clientOrders = orders.filter((o) => {
+    if (currentUser.uid) return o.customerUid === currentUser.uid;
+    return (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name);
+  });
   const activeOrders = clientOrders.filter(
     (o) => o.status === 'pendiente' || o.status === 'en_preparacion' || o.status === 'en_ruta'
   );
 
   // Appointments statistics
-  const clientAppointments = appointments.filter(
-    (a) => (currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name)
-  );
+  const clientAppointments = appointments.filter((a) => {
+    if (currentUser.uid) return a.customerUid === currentUser.uid;
+    return (currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name);
+  });
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-28 pt-2 animate-in fade-in duration-200">
@@ -315,6 +323,128 @@ export const CustomerProfileView: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* 4. "Mis Datos" Transparency Section */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+          <h3 className="font-extrabold text-slate-900 text-base tracking-tight flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Mis Datos Almacenados (Privacidad)</span>
+          </h3>
+        </div>
+        <p className="text-xs text-slate-600">
+          De conformidad con las normativas de protección de datos, aquí puedes ver la información que almacenamos asociada a tu perfil:
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400">Nombre y Contacto</span>
+            <p className="font-bold text-slate-800">{currentUser.name || name || 'No especificado'}</p>
+            <p className="text-slate-500">{currentUser.email || 'Sin correo'} · {phone || currentUser.phone || 'Sin teléfono'}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400">Dirección Registrada</span>
+            <p className="font-bold text-slate-800">{address || currentUser.address || 'No especificada'}</p>
+            <p className="text-slate-500">Rol: {currentUser.role === 'admin' ? 'Administrador' : 'Cliente'}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400">Actividad en la App</span>
+            <p className="font-bold text-slate-800">{clientAppointments.length} citas · {clientOrders.length} pedidos</p>
+            <p className="text-slate-500">Método de acceso: {currentUser.authProvider || 'invitado'}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400">Privacidad y Consentimiento</span>
+            <p className="font-bold text-emerald-700">✓ Aviso de Privacidad Aceptado</p>
+            <p className="text-slate-500">Tratamiento de datos para citas y pedidos activo.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. "Eliminar mi cuenta" Section */}
+      {currentUser.isLoggedIn && (
+        <div className="bg-rose-50/60 rounded-3xl border border-rose-200 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="border-b border-rose-200/60 pb-3 flex items-center justify-between">
+            <h3 className="font-extrabold text-rose-950 text-base tracking-tight">
+              Zona de Peligro · Eliminar Mi Cuenta
+            </h3>
+          </div>
+          <p className="text-xs text-rose-900 leading-relaxed">
+            Eliminar tu cuenta borrará permanentemente tu usuario, tus datos personales de la base de datos y tu acceso en Firebase Auth. Tus citas futuras serán canceladas. Esta acción no se puede deshacer.
+          </p>
+
+          {!showDeleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleteConfirm(true);
+                setDeleteError(null);
+              }}
+              className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95"
+            >
+              Eliminar mi cuenta
+            </button>
+          ) : (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setDeleteError(null);
+              setDeleting(true);
+              try {
+                await deleteMyAccount(currentUser.authProvider === 'password' ? deletePassword : undefined);
+              } catch (err: any) {
+                console.error('Delete account error:', err);
+                setDeleteError(err?.message || 'Error al eliminar la cuenta. Verifica tu contraseña.');
+                setDeleting(false);
+              }
+            }} className="p-4 bg-white rounded-2xl border border-rose-300 space-y-3 text-xs">
+              <p className="font-bold text-rose-900">
+                Confirmación requerida en dos pasos: ¿Estás totalmente segura de que deseas eliminar tu cuenta?
+              </p>
+
+              {currentUser.authProvider === 'password' && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Ingresa tu contraseña actual para confirmar:</label>
+                  <input
+                    type="password"
+                    required
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              )}
+
+              {deleteError && (
+                <p className="text-xs font-bold text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                  {deleteError}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeletePassword('');
+                    setDeleteError(null);
+                  }}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold bg-slate-50 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-bold shadow-xs flex items-center gap-2"
+                >
+                  {deleting && <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full" />}
+                  <span>Sí, eliminar mi cuenta definitivamente</span>
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Authorized Admin Section (Only shown if current logged-in user is the administrator) */}
       {isAdminUser && (

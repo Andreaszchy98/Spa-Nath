@@ -18,9 +18,19 @@ import { useApp } from '../../context/AppContext';
 import { Order, OrderStatus, Appointment, AppointmentStatus } from '../../types';
 
 export const CustomerOrdersHistory: React.FC = () => {
-  const { orders, appointments, updateAppointmentStatus, updateOrderStatus, businessProfile, theme, setCustomerTab, addToCart } = useApp();
-  const uniqueOrders = Array.from(new Map(orders.map((o) => [o.id, o])).values());
-  const uniqueAppointments = Array.from(new Map(appointments.map((a) => [a.id, a])).values());
+  const { orders, appointments, updateAppointmentStatus, updateOrderStatus, businessProfile, theme, setCustomerTab, addToCart, currentUser } = useApp();
+  
+  const clientOrders = orders.filter((o) => {
+    if (currentUser.uid) return o.customerUid === currentUser.uid;
+    return (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name);
+  });
+  const clientAppointments = appointments.filter((a) => {
+    if (currentUser.uid) return a.customerUid === currentUser.uid;
+    return (currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name);
+  });
+
+  const uniqueOrders = Array.from(new Map(clientOrders.map((o) => [o.id, o])).values());
+  const uniqueAppointments = Array.from(new Map(clientAppointments.map((a) => [a.id, a])).values());
   const [ticketOrder, setTicketOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'pedidos' | 'citas'>('pedidos');
 
@@ -123,7 +133,7 @@ export const CustomerOrdersHistory: React.FC = () => {
           }`}
         >
           <Package className="w-4 h-4" />
-          <span>Mis Pedidos ({orders.length})</span>
+          <span>Mis Pedidos ({uniqueOrders.length})</span>
         </button>
         <button
           type="button"
@@ -135,7 +145,7 @@ export const CustomerOrdersHistory: React.FC = () => {
           }`}
         >
           <Calendar className="w-4 h-4" />
-          <span>Mis Citas de Servicios ({appointments.length})</span>
+          <span>Mis Citas de Servicios ({uniqueAppointments.length})</span>
         </button>
       </div>
 

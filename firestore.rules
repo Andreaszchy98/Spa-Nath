@@ -81,10 +81,10 @@ service cloud.firestore {
 
     // Orders collection
     match /orders/{orderId} {
-      allow get, list: if true;
-      allow create: if isValidId(orderId) && isValidOrder(incoming());
-      allow update: if isValidId(orderId);
-      allow delete: if isValidId(orderId);
+      allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(orderId) && isValidOrder(incoming());
+      allow update: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow delete: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
     }
 
     // Banners collection
@@ -120,7 +120,10 @@ service cloud.firestore {
 
     // Appointments collection
     match /appointments/{appId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(appId);
+      allow update: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow delete: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
     }
 
     // Services collection

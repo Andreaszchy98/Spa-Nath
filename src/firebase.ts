@@ -9,6 +9,10 @@ import {
   onAuthStateChanged,
   updateProfile,
   sendPasswordResetEmail,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
@@ -17,6 +21,8 @@ import {
   getDocFromServer,
   collection,
   onSnapshot,
+  query,
+  where,
   setDoc,
   deleteDoc,
   writeBatch,
@@ -248,11 +254,13 @@ export async function deleteIngredientFirestore(ingredientId: string): Promise<v
 // --- Orders ---
 export function subscribeOrders(
   onSuccess: (orders: Order[]) => void,
-  onError?: (err: Error) => void
+  onError?: (err: Error) => void,
+  userId?: string
 ) {
   const path = 'orders';
+  const q = userId ? query(collection(db, path), where('customerUid', '==', userId)) : collection(db, path);
   return onSnapshot(
-    collection(db, path),
+    q,
     (snapshot) => {
       const items: Order[] = [];
       snapshot.forEach((docSnap) => {
@@ -558,10 +566,15 @@ export async function deleteExceptionFirestore(excId: string): Promise<void> {
 }
 
 // --- Appointments ---
-export function subscribeAppointments(onSuccess: (appointments: Appointment[]) => void, onError?: (err: Error) => void) {
+export function subscribeAppointments(
+  onSuccess: (appointments: Appointment[]) => void, 
+  onError?: (err: Error) => void,
+  userId?: string
+) {
   const path = 'appointments';
+  const q = userId ? query(collection(db, path), where('customerUid', '==', userId)) : collection(db, path);
   return onSnapshot(
-    collection(db, path),
+    q,
     (snapshot) => {
       const items: Appointment[] = [];
       snapshot.forEach((docSnap) => items.push({ ...docSnap.data(), id: docSnap.id } as Appointment));
@@ -843,7 +856,7 @@ export async function logoutUser(): Promise<void> {
   }
 }
 
-export { onAuthStateChanged };
+export { onAuthStateChanged, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider, deleteUser };
 export type { FirebaseUser };
 
 

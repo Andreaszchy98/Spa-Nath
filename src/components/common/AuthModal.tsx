@@ -41,6 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     authLoading,
     authError,
     clearAuthError,
+    setIsPrivacyModalOpen,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<AuthTab>('login');
@@ -52,6 +53,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [displayName, setDisplayName] = useState('');
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   if (!isOpen) return null;
 
@@ -522,9 +524,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
 
+                    <div className="flex items-start gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="privacy-reg"
+                        required
+                        checked={privacyAccepted}
+                        onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <label htmlFor="privacy-reg" className="text-[11px] text-slate-600 cursor-pointer">
+                        He leído el <button type="button" onClick={() => setIsPrivacyModalOpen(true)} className="text-slate-900 font-bold underline">Aviso de Privacidad</button> y acepto el tratamiento de mis datos para gestionar mis citas y pedidos.
+                      </label>
+                    </div>
+
                     <button
                       type="submit"
-                      disabled={authLoading}
+                      disabled={!privacyAccepted || authLoading}
                       className={`w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 ${theme.buttonClass}`}
                     >
                       {authLoading && <Loader2 className="w-4 h-4 animate-spin" />}

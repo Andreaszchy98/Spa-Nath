@@ -167,6 +167,7 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   customerNotes?: string;
+  customerUid?: string | null;
   items: CartItem[];
   subtotal: number;
   total: number;
@@ -222,6 +223,9 @@ export interface Appointment {
   customerPhone: string;
   customerNotes?: string;
   customerAddress?: string;
+  customerUid?: string | null;
+  privacyAcceptedAt?: string;
+  healthConsent?: boolean;
   modality?: ServiceModality; // 'local' | 'domicilio'
   travelDistanceKm?: number;
   travelSurcharge?: number;

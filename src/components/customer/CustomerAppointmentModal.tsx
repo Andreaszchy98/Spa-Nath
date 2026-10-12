@@ -37,6 +37,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     businessProfile,
     theme,
     currentUser,
+    setIsPrivacyModalOpen,
   } = useApp();
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
@@ -58,6 +59,8 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   const [customerName, setCustomerName] = useState<string>(currentUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState<string>(currentUser?.phone || '');
   const [customerNotes, setCustomerNotes] = useState<string>('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [healthConsent, setHealthConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<{
@@ -97,7 +100,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedServiceId || !selectedDate || !selectedTime || !customerName.trim() || !customerPhone.trim()) return;
+    if (!selectedServiceId || !selectedDate || !selectedTime || !customerName.trim() || !customerPhone.trim() || !privacyAccepted) return;
 
     setSubmitting(true);
     setBookingError(null);
@@ -111,6 +114,8 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
         modality: 'local',
         dateStr: selectedDate,
         timeStr: selectedTime,
+        privacyAcceptedAt: new Date().toISOString(),
+        healthConsent,
       });
 
       setSuccessApp({
@@ -137,6 +142,8 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     setCustomerNotes('');
     setCustomerName('');
     setCustomerPhone('');
+    setPrivacyAccepted(false);
+    setHealthConsent(false);
     onClose();
   };
 
@@ -145,6 +152,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     if (!selectedDate || !selectedTime) return 'Selecciona fecha y hora';
     if (!customerName.trim()) return 'Ingresa tu nombre completo';
     if (!customerPhone.trim()) return 'Ingresa tu teléfono / WhatsApp';
+    if (!privacyAccepted) return 'Acepta el Aviso de Privacidad';
     return null;
   };
   const missingMsg = getMissingFieldsMessage();
@@ -444,6 +452,35 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                   rows={2}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 resize-none"
                 />
+
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="privacy-app"
+                      required
+                      checked={privacyAccepted}
+                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <label htmlFor="privacy-app" className="text-[11px] text-slate-600 cursor-pointer">
+                      He leído el <button type="button" onClick={() => setIsPrivacyModalOpen(true)} className="text-slate-900 font-bold underline">Aviso de Privacidad</button> y acepto el tratamiento de mis datos para gestionar mis citas y pedidos. *
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="health-app"
+                      checked={healthConsent}
+                      onChange={(e) => setHealthConsent(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <label htmlFor="health-app" className="text-[11px] text-slate-600 cursor-pointer">
+                      Autorizo el uso de las alergias o datos de salud que escriba en mis notas. (Opcional)
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {/* Policies Card */}

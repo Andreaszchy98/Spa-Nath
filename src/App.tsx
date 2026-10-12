@@ -1,6 +1,8 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
+import { Footer } from './components/common/Footer';
+import { PrivacyPolicyModal } from './components/common/PrivacyPolicyModal';
 import { CustomerCatalogView } from './components/customer/CustomerCatalogView';
 import { CustomerOrdersHistory } from './components/customer/CustomerOrdersHistory';
 import { CustomerProfileView } from './components/customer/CustomerProfileView';
@@ -11,7 +13,7 @@ import { AdminPanel } from './components/admin/AdminPanel';
 import { ShieldCheck } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { theme, currentUser, customerTab, businessProfile } = useApp();
+  const { theme, currentUser, customerTab, businessProfile, isPrivacyModalOpen, setIsPrivacyModalOpen } = useApp();
   const isAdmin = currentUser.role === 'admin';
 
   return (
@@ -33,6 +35,9 @@ const AppContent: React.FC = () => {
         ) : (
           <CustomerProfileView />
         )}
+        
+        {/* Footer with Privacy Notice Link */}
+        <Footer onOpenPrivacy={() => setIsPrivacyModalOpen(true)} />
       </main>
 
       {/* Customer Bottom Navigation Bar */}
@@ -41,6 +46,7 @@ const AppContent: React.FC = () => {
       {/* Global Modals & Drawers */}
       <ProductCustomizerModal />
       <CartDrawer />
+      <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />
     </div>
   );
 };

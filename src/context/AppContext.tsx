@@ -1,4 +1,4 @@
-import { doc, runTransaction, collection, setDoc, getDoc } from 'firebase/firestore';
+import { doc, runTransaction, collection, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import {
@@ -85,6 +85,11 @@ import {
   isUserAdminEmail,
   ADMIN_EMAILS,
   cleanObject,
+  reauthenticateWithPopup,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  deleteUser,
+  googleAuthProvider,
 } from '../firebase';
 import {
   getPushPermission,
@@ -176,9 +181,20 @@ interface AppContextType {
   isCartDrawerOpen: boolean;
   setIsCartDrawerOpen: (open: boolean) => void;
 
+  // Notification Drawer
+  isNotificationDrawerOpen: boolean;
+  setIsNotificationDrawerOpen: (open: boolean) => void;
+
   // Auth / Role Selector Modal
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+
+  // Privacy Policy Modal
+  isPrivacyModalOpen: boolean;
+  setIsPrivacyModalOpen: (open: boolean) => void;
+
+  // Account deletion
+  deleteMyAccount: (password?: string) => Promise<void>;
 
   // Active Admin Tab (Removed logistica)
   adminTab: 'resumen' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda';
@@ -231,6 +247,8 @@ interface AppContextType {
     modality?: 'local' | 'domicilio';
     dateStr: string;
     timeStr: string;
+    privacyAcceptedAt?: string;
+    healthConsent?: boolean;
   }) => Promise<Appointment>;
   updateAppointmentStatus: (id: string, status: AppointmentStatus) => void;
   deleteAppointment: (id: string) => void;
@@ -788,6 +806,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const lastSeenNotifIdsRef = useRef<Set<string>>(new Set());
+  const recentlyPushedIdsRef = useRef<Set<string>>(new Set());
+
+  const triggerPushOnce = (notif: Pick<AppNotification, 'id' | 'title' | 'message' | 'type' | 'linkTab'>) => {
+    if (recentlyPushedIdsRef.current.has(notif.id)) {
+      return;
+    }
+    recentlyPushedIdsRef.current.add(notif.id);
+    setTimeout(() => {
+      recentlyPushedIdsRef.current.delete(notif.id);
+    }, 15000);
+    triggerDevicePushNotification(notif, pushPreferences);
+  };
 
   useEffect(() => {
     localStorage.setItem('bl_notifications_list', JSON.stringify(notifications));
@@ -831,7 +861,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     // 1. Play sound, vibrate, and show system push notification
-    triggerDevicePushNotification(newNotif, pushPreferences);
+    triggerPushOnce(newNotif);
 
     // 2. Add to local state (newest first)
     setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
@@ -1068,6 +1098,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     modality?: 'local' | 'domicilio';
     dateStr: string;
     timeStr: string;
+    privacyAcceptedAt?: string;
+    healthConsent?: boolean;
   }): Promise<Appointment> => {
     const foundService =
       services.find((s) => s.id === data.serviceId) ||
@@ -1180,6 +1212,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerPhone: data.customerPhone,
       customerNotes: data.customerNotes || '',
       customerAddress: data.customerAddress || '',
+      customerUid: currentUser.uid || null,
+      privacyAcceptedAt: data.privacyAcceptedAt || new Date().toISOString(),
+      healthConsent: Boolean(data.healthConsent),
       modality: appointmentModality,
       travelDistanceKm: Number((appointmentModality === 'domicilio' && servObj) ? servObj.maxHomeZoneKm || 0 : 0),
       travelSurcharge: Number((appointmentModality === 'domicilio' && servObj) ? servObj.travelSurcharge || 0 : 0),
@@ -1199,22 +1234,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await setDoc(newAppointmentRef, cleanedAppointment);
     } catch (saveError) {
-      console.warn('Advertencia al guardar cita en Firestore:', saveError);
+      console.error('Error al guardar cita en Firestore:', saveError);
+      throw saveError;
     }
 
-    try {
-      const notifRef = doc(collection(db, 'notifications'));
-      await setDoc(notifRef, {
-        id: notifRef.id,
-        userId: data.providerId || provider?.id || 'admin',
-        message: `Nueva cita: ${data.customerName} para ${service.name} el ${data.dateStr} a las ${data.timeStr}`,
-        type: 'appointment_created',
-        read: false,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (notifErr) {
-      console.warn('Advertencia escribiendo notificación de cita:', notifErr);
-    }
+
 
     setAppointments((prev) => [newAppointment, ...prev]);
 
@@ -1246,17 +1270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const appRef = doc(db, 'appointments', id);
         transaction.update(appRef, { status: 'cancelada' });
 
-        try {
-          const notifRef = doc(collection(db, 'notifications'));
-          transaction.set(notifRef, {
-            id: notifRef.id,
-            userId: app.providerId || 'admin',
-            message: `Cita cancelada: ${app.appointmentNumber}`,
-            type: 'appointment_cancelled',
-            read: false,
-            createdAt: new Date().toISOString(),
-          });
-        } catch (_) {}
+
       });
     } catch (txError) {
       console.warn('Error en transacción de cancelación:', txError);
@@ -1507,7 +1521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (lastSeenNotifIdsRef.current.size > 0) {
         remoteNotifs.forEach((n) => {
           if (!lastSeenNotifIdsRef.current.has(n.id) && !n.read) {
-            triggerDevicePushNotification(n, pushPreferences);
+            triggerPushOnce(n);
           }
         });
       }
@@ -1852,7 +1866,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Modals & Navigation States
   const [modalProductId, setModalProductId] = useState<string | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+
+  const deleteMyAccount = async (password?: string) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No hay usuario autenticado.');
+    const uid = user.uid;
+
+    const providerId = user.providerData[0]?.providerId;
+    if (providerId === 'google.com') {
+      await reauthenticateWithPopup(user, googleAuthProvider);
+    } else if (password) {
+      const credential = EmailAuthProvider.credential(user.email || '', password);
+      await reauthenticateWithCredential(user, credential);
+    } else {
+      throw new Error('Se requiere contraseña para confirmar la eliminación de cuenta.');
+    }
+
+    const now = new Date().getTime();
+    const userApps = appointments.filter((a) => a.customerUid === uid || (currentUser.phone && a.customerPhone === currentUser.phone));
+    for (const app of userApps) {
+      if (new Date(app.startTimeUtc).getTime() > now && app.status !== 'cancelada') {
+        try {
+          await cancelAppointment(app.id);
+        } catch (e) {}
+      }
+      try {
+        const appRef = doc(db, 'appointments', app.id);
+        await setDoc(appRef, {
+          customerName: 'Cuenta eliminada',
+          customerPhone: '',
+          customerNotes: '',
+          customerAddress: '',
+          customerUid: null,
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    const userOrders = orders.filter((o) => o.customerUid === uid || (currentUser.phone && o.customerPhone === currentUser.phone));
+    for (const ord of userOrders) {
+      try {
+        const ordRef = doc(db, 'orders', ord.id);
+        await setDoc(ordRef, {
+          customerName: 'Cuenta eliminada',
+          customerPhone: '',
+          customerNotes: '',
+          customerUid: null,
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (e) {}
+
+    await deleteUser(user);
+
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('bl_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    setCurrentUser({
+      role: 'client',
+      name: '',
+      phone: '',
+      address: '',
+      isLoggedIn: false,
+      authProvider: 'guest',
+    });
+    setCustomerTab('catalogo');
+  };
   const [adminTab, setAdminTab] = useState<'resumen' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda'>('resumen');
   const [customerTab, setCustomerTab] = useState<'catalogo' | 'pedidos' | 'perfil'>('catalogo');
 
@@ -1965,8 +2055,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeProductModal,
         isCartDrawerOpen,
         setIsCartDrawerOpen,
+        isNotificationDrawerOpen,
+        setIsNotificationDrawerOpen,
         isAuthModalOpen,
         setIsAuthModalOpen,
+        isPrivacyModalOpen,
+        setIsPrivacyModalOpen,
+        deleteMyAccount,
         adminTab,
         setAdminTab,
         customerTab,
