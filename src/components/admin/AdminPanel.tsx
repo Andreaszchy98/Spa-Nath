@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminSalesOrders } from './AdminSalesOrders';
+import { AdminLogistics } from './AdminLogistics';
 import { AdminInventory } from './AdminInventory';
 import { AdminCatalog } from './AdminCatalog';
 import { AdminServices } from './AdminServices';
@@ -18,6 +19,7 @@ export const AdminPanel: React.FC = () => {
       {adminTab === 'resumen' && <AdminDashboard />}
       {adminTab === 'agenda' && <AdminSchedule />}
       {adminTab === 'pedidos' && <AdminSalesOrders />}
+      {adminTab === 'logistica' && <AdminLogistics />}
       {adminTab === 'inventario' && <AdminInventory />}
       {adminTab === 'servicios' && <AdminServices />}
       {adminTab === 'catalogo' && <AdminCatalog />}

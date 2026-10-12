@@ -13,6 +13,8 @@ import {
   Scissors,
   User,
   XCircle,
+  Truck,
+  MapPin,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order, OrderStatus, Appointment, AppointmentStatus } from '../../types';
@@ -175,10 +177,17 @@ export const CustomerOrdersHistory: React.FC = () => {
                         <span className="font-mono font-bold text-base text-slate-900">
                           {order.orderNumber}
                         </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                          <Store className="w-3 h-3 text-blue-600" />
-                          <span>Para Recoger</span>
-                        </span>
+                        {order.orderType === 'recoger' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                            <Store className="w-3 h-3 text-blue-600" />
+                            <span>Para Recoger</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                            <Truck className="w-3 h-3 text-indigo-600" />
+                            <span>Envío a Domicilio</span>
+                          </span>
+                        )}
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusInfo.bg}`}
                         >
@@ -186,14 +195,26 @@ export const CustomerOrdersHistory: React.FC = () => {
                           <span>{statusInfo.label}</span>
                         </span>
                       </div>
-                      <span className="text-[11px] text-slate-400">
-                        {new Date(order.createdAt).toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                        <span>
+                          {new Date(order.createdAt).toLocaleDateString('es-ES', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {order.orderType !== 'recoger' && order.customerAddress && (
+                          <span className="flex items-center gap-1 text-slate-600">
+                            • <MapPin className="w-3 h-3 text-rose-500 inline" /> {order.customerAddress}
+                          </span>
+                        )}
+                        {order.shippingDetails?.trackingNumber && (
+                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                            Guía: {order.shippingDetails.trackingNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Actions */}

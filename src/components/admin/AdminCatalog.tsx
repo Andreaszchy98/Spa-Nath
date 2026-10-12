@@ -315,9 +315,7 @@ export const AdminCatalog: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-900">
             Catálogo de Productos
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Gestiona productos físicos para venta y retail con control de inventario, stock, SKU y fotos. Los servicios de spa se declaran y configuran en el <strong>Catálogo de Servicios</strong>.
-          </p>
+
         </div>
 
         <button

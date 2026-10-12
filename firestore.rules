@@ -7,6 +7,36 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() &&
+             request.auth.token.email != null &&
+             (
+               request.auth.token.email.lower() == 'jorgeandres980706@gmail.com' ||
+               (request.auth.token.email_verified == true && request.auth.token.email.lower() in ['jorgeandres980706@gmail.com'])
+             );
+    }
+
+    function isOwner() {
+      return isSignedIn() && resource.data.customerUid == request.auth.uid;
+    }
+
+    function validOwnerField() {
+      return !('customerUid' in incoming()) ||
+             incoming().customerUid == null ||
+             (isSignedIn() && incoming().customerUid == request.auth.uid);
+    }
+
+    function isAnonymizing() {
+      return isSignedIn() &&
+             existing().customerUid == request.auth.uid &&
+             incoming().customerUid == null &&
+             incoming().customerName == 'Cuenta eliminada' &&
+             incoming().customerPhone == '' &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'customerName', 'customerPhone', 'customerNotes', 'customerAddress', 'customerUid'
+             ]);
+    }
+
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -79,12 +109,14 @@ service cloud.firestore {
       allow delete: if isValidId(ingredientId);
     }
 
-    // Orders collection
+    // Orders collection: Admin or Owner read; Create with valid fields; Update by admin, owner cancel, or anonymizing; Delete only admin
     match /orders/{orderId} {
-      allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
-      allow create: if isSignedIn() && isValidId(orderId) && isValidOrder(incoming());
-      allow update: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
-      allow delete: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow get, list: if isAdmin() || isOwner();
+      allow create: if isValidId(orderId) && isValidOrder(incoming()) && validOwnerField();
+      allow update: if isAdmin() ||
+                      (isOwner() && existing().status == 'pendiente' && incoming().status == 'cancelado') ||
+                      isAnonymizing();
+      allow delete: if isAdmin();
     }
 
     // Banners collection
@@ -118,12 +150,14 @@ service cloud.firestore {
       allow get, list, create, update, delete: if true;
     }
 
-    // Appointments collection
+    // Appointments collection: Admin or Owner read; Create with valid fields; Update by admin, owner cancel, or anonymizing; Delete only admin
     match /appointments/{appId} {
-      allow get, list: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
-      allow create: if isSignedIn() && isValidId(appId);
-      allow update: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
-      allow delete: if isSignedIn() && (resource.data.customerUid == request.auth.uid);
+      allow get, list: if isAdmin() || isOwner();
+      allow create: if isValidId(appId) && validOwnerField();
+      allow update: if isAdmin() ||
+                      (isOwner() && incoming().status == 'cancelada') ||
+                      isAnonymizing();
+      allow delete: if isAdmin();
     }
 
     // Services collection
@@ -136,9 +170,17 @@ service cloud.firestore {
       allow get, list, create, update, delete: if true;
     }
 
-    // Notifications collection
+    // Notifications collection: Admin or Recipient read; Create by admin, user to admin, or to self; Update read flag; Delete
     match /notifications/{notificationId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if isAdmin() || (isSignedIn() && resource.data.recipientUid == request.auth.uid);
+      allow create: if isValidId(notificationId) &&
+                      incoming().title is string &&
+                      incoming().message is string &&
+                      (incoming().audience == 'admin' || incoming().audience == 'user') &&
+                      (isAdmin() || incoming().audience == 'admin' || (isSignedIn() && incoming().recipientUid == request.auth.uid));
+      allow update: if (isAdmin() || (isSignedIn() && resource.data.recipientUid == request.auth.uid)) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.recipientUid == request.auth.uid);
     }
 
     // Global Catch-All: Deny unmatched documents

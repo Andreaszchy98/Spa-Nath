@@ -10,8 +10,8 @@ import {
   Settings,
   ChevronDown,
   Calendar,
-  Store,
   Bell,
+  Truck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AuthModal } from './AuthModal';
@@ -48,8 +48,6 @@ export const Header: React.FC = () => {
     (o) => o.status === 'pendiente' || o.status === 'en_preparacion'
   ).length;
 
-  const pendingAppointmentsCount = appointments.filter((a) => a.status === 'pendiente').length;
-
   const lowStockCount = products.filter((p) => p.stock <= p.minStockAlert).length;
 
   // Admin pages list with clean icons and names
@@ -61,13 +59,12 @@ export const Header: React.FC = () => {
     },
     {
       id: 'agenda' as const,
-      name: 'Agenda & Citas',
+      name: 'Gestión de Agenda',
       icon: <Calendar className="w-4 h-4" />,
-      badge: pendingAppointmentsCount,
     },
     {
       id: 'pedidos' as const,
-      name: 'Ventas & Órdenes de Spa',
+      name: 'Citas & Ventas',
       icon: <ShoppingBag className="w-4 h-4" />,
       badge: pendingOrdersCount,
     },
@@ -307,19 +304,6 @@ export const Header: React.FC = () => {
               )}
             </div>
 
-            {/* Quick Preview Store button for the admin */}
-            <button
-              type="button"
-              onClick={() => {
-                switchRole('client');
-                setCustomerTab('catalogo');
-              }}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs active:scale-95"
-              title="Ver cómo ve la tienda un cliente"
-            >
-              <Store className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden xs:inline">Vista Cliente</span>
-            </button>
           </div>
         )}
       </header>

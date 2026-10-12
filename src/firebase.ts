@@ -255,10 +255,14 @@ export async function deleteIngredientFirestore(ingredientId: string): Promise<v
 export function subscribeOrders(
   onSuccess: (orders: Order[]) => void,
   onError?: (err: Error) => void,
-  userId?: string
+  userId?: string,
+  isAll?: boolean
 ) {
   const path = 'orders';
-  const q = userId ? query(collection(db, path), where('customerUid', '==', userId)) : collection(db, path);
+  if (!isAll && !userId) {
+    return () => {};
+  }
+  const q = isAll ? collection(db, path) : query(collection(db, path), where('customerUid', '==', userId));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -320,6 +324,16 @@ export async function updateOrderStatusFirestore(orderId: string, status: Order[
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
+
+export async function deleteOrderFirestore(orderId: string): Promise<void> {
+  const path = `orders/${orderId}`;
+  try {
+    await deleteDoc(doc(db, 'orders', orderId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 
 // --- Banners ---
 export function subscribeBanners(
@@ -569,10 +583,14 @@ export async function deleteExceptionFirestore(excId: string): Promise<void> {
 export function subscribeAppointments(
   onSuccess: (appointments: Appointment[]) => void, 
   onError?: (err: Error) => void,
-  userId?: string
+  userId?: string,
+  isAll?: boolean
 ) {
   const path = 'appointments';
-  const q = userId ? query(collection(db, path), where('customerUid', '==', userId)) : collection(db, path);
+  if (!isAll && !userId) {
+    return () => {};
+  }
+  const q = isAll ? collection(db, path) : query(collection(db, path), where('customerUid', '==', userId));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -668,10 +686,28 @@ export async function deleteServiceFirestore(serviceId: string): Promise<void> {
 }
 
 // --- Notifications ---
-export function subscribeNotifications(onSuccess: (notifications: AppNotification[]) => void, onError?: (err: Error) => void) {
+export interface NotificationSubscriptionScope {
+  isAdmin: boolean;
+  uid: string | null;
+}
+
+export function subscribeNotifications(
+  onSuccess: (notifications: AppNotification[]) => void,
+  onError?: (err: Error) => void,
+  scope?: NotificationSubscriptionScope
+) {
   const path = 'notifications';
+  // Invitada: no se suscribe
+  if (!scope || (!scope.isAdmin && !scope.uid)) {
+    return () => {};
+  }
+  // Gerente: colección completa. Clienta: where('recipientUid', '==', uid)
+  const q = scope.isAdmin
+    ? collection(db, path)
+    : query(collection(db, path), where('recipientUid', '==', scope.uid));
+
   return onSnapshot(
-    collection(db, path),
+    q,
     (snapshot) => {
       const items: AppNotification[] = [];
       snapshot.forEach((docSnap) => {
@@ -685,6 +721,8 @@ export function subscribeNotifications(onSuccess: (notifications: AppNotificatio
           read: Boolean(data.read),
           linkTab: data.linkTab,
           createdAt: data.createdAt || new Date().toISOString(),
+          audience: data.audience || 'admin',
+          recipientUid: data.recipientUid || null,
         } as AppNotification);
       });
       // Sort newest first

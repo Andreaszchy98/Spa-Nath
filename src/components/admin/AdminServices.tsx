@@ -167,9 +167,7 @@ export const AdminServices: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-900">
             Catálogo de Servicios de Spa & Tratamientos
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Servicios sin stock ni SKU, con duración, pausas, modalidades presenciales/domicilio y reglas de confirmación.
-          </p>
+
         </div>
 
         <button

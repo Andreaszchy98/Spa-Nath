@@ -28,6 +28,7 @@ import {
   Provider,
   ScheduleException,
   Service,
+  ShippingDetails,
   ThemeConfig,
   ThemeId,
   UserRole,
@@ -55,6 +56,7 @@ import {
   deleteIngredientFirestore,
   saveOrderFirestore,
   updateOrderStatusFirestore,
+  deleteOrderFirestore,
   upsertBannerFirestore,
   deleteBannerFirestore,
   saveBusinessProfileFirestore,
@@ -196,13 +198,20 @@ interface AppContextType {
   // Account deletion
   deleteMyAccount: (password?: string) => Promise<void>;
 
-  // Active Admin Tab (Removed logistica)
-  adminTab: 'resumen' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda';
-  setAdminTab: (tab: 'resumen' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda') => void;
+  // Active Admin Tab
+  adminTab: 'resumen' | 'pedidos' | 'logistica' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda';
+  setAdminTab: (tab: 'resumen' | 'pedidos' | 'logistica' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda') => void;
 
   // Active Customer Tab
   customerTab: 'catalogo' | 'pedidos' | 'perfil';
   setCustomerTab: (tab: 'catalogo' | 'pedidos' | 'perfil') => void;
+
+  // Logistics & Shipping
+  updateOrderShipping: (
+    orderId: string,
+    shippingUpdates: Partial<ShippingDetails>,
+    newStatus?: OrderStatus
+  ) => Promise<void>;
 
   // Services (Spa Catalog - No Stock, No SKU)
   services: Service[];
@@ -271,9 +280,27 @@ interface AppContextType {
     title: string;
     message: string;
     type: NotificationType;
-    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
     userId?: string;
+    audience?: 'admin' | 'user';
+    recipientUid?: string | null;
+    localOnly?: boolean;
   }) => Promise<void>;
+  notifyAdmin: (data: {
+    title: string;
+    message: string;
+    type: NotificationType;
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
+  }) => Promise<void>;
+  notifyCustomer: (
+    uid: string | null | undefined,
+    data: {
+      title: string;
+      message: string;
+      type: NotificationType;
+      linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
+    }
+  ) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
@@ -596,7 +623,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...orderData,
       id: `ord-${Date.now()}`,
       orderNumber,
-      orderType: 'recoger',
+      customerUid: currentUser.uid || null,
+      orderType: orderData.orderType || 'recoger',
+      customerAddress: orderData.customerAddress || currentUser.address || '',
       createdAt: new Date().toISOString(),
     };
 
@@ -656,13 +685,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders((prev) => [newOrder, ...prev]);
     saveOrderFirestore(newOrder).catch((err) => console.warn('Firestore saveOrder error:', err));
 
-    // Send push notification for new order
-    sendPushNotification({
+    // Send push notification for new order: notifyAdmin + notifyCustomer
+    notifyAdmin({
       title: '¡Nuevo Pedido Recibido!',
       message: `Orden #${orderNumber} por ${businessProfile.currency}${newOrder.total.toFixed(2)} (${newOrder.customerName})`,
       type: 'order_created',
       linkTab: 'pedidos',
     });
+
+    if (currentUser.uid) {
+      notifyCustomer(currentUser.uid, {
+        title: 'Pedido recibido',
+        message: `Tu orden #${orderNumber} ha sido recibida y está siendo procesada.`,
+        type: 'order_created',
+        linkTab: 'pedidos',
+      });
+    }
 
     return newOrder;
   };
@@ -723,16 +761,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
     updateOrderStatusFirestore(orderId, status).catch((err) => console.warn('Firestore updateOrderStatus error:', err));
     if (target) {
-      const notifTitle = status === 'cancelado' ? 'Pedido Cancelado' : 'Pedido Actualizado';
-      const notifMsg = status === 'cancelado' 
-        ? `La orden #${target.orderNumber} ha sido cancelada y se ha liberado el stock.`
-        : `La orden #${target.orderNumber} cambió a "${status}".`;
-      sendPushNotification({
-        title: notifTitle,
-        message: notifMsg,
-        type: 'order_updated',
-        linkTab: 'pedidos',
-      });
+      const isActingAsAdmin = isAdminUser || currentUser.role === 'admin';
+      if (isActingAsAdmin) {
+        if (target.customerUid) {
+          notifyCustomer(target.customerUid, {
+            title: status === 'cancelado' ? 'Pedido Cancelado' : 'Pedido Actualizado',
+            message: status === 'cancelado'
+              ? `Tu orden #${target.orderNumber} ha sido cancelada.`
+              : `Tu orden #${target.orderNumber} cambió a "${status}".`,
+            type: 'order_updated',
+            linkTab: 'pedidos',
+          });
+        }
+      } else {
+        notifyAdmin({
+          title: status === 'cancelado' ? 'Pedido Cancelado por Cliente' : 'Pedido Actualizado',
+          message: status === 'cancelado'
+            ? `La orden #${target.orderNumber} de ${target.customerName} ha sido cancelada.`
+            : `La orden #${target.orderNumber} cambió a "${status}".`,
+          type: 'order_updated',
+          linkTab: 'pedidos',
+        });
+      }
     }
   };
 
@@ -741,20 +791,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateAppointmentStatusFirestore(id, status).catch((err) => console.warn('Firestore updateAppointmentStatus error:', err));
     const target = appointments.find((a) => a.id === id);
     if (target) {
-      if (status === 'confirmada') {
-        sendPushNotification({
-          title: 'Cita Confirmada',
-          message: `La cita #${target.appointmentNumber} de ${target.customerName} ha sido confirmada.`,
-          type: 'appointment_updated',
-          linkTab: 'agenda',
-        });
-      } else if (status === 'completada') {
-        sendPushNotification({
-          title: 'Cita Completada',
-          message: `La cita #${target.appointmentNumber} de ${target.customerName} fue marcada como completada.`,
-          type: 'appointment_updated',
-          linkTab: 'agenda',
-        });
+      if (status === 'confirmada' || status === 'completada') {
+        if (target.customerUid) {
+          notifyCustomer(target.customerUid, {
+            title: status === 'confirmada' ? 'Cita Confirmada' : 'Cita Completada',
+            message: status === 'confirmada'
+              ? `La cita #${target.appointmentNumber} de ${target.customerName} ha sido confirmada.`
+              : `La cita #${target.appointmentNumber} de ${target.customerName} fue marcada como completada.`,
+            type: 'appointment_updated',
+            linkTab: 'agenda',
+          });
+        }
       }
     }
   };
@@ -778,6 +825,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(updated));
       return updated;
     });
+    deleteOrderFirestore(orderId).catch((err) => console.warn('Firestore deleteOrder error:', err));
   };
 
   const clearAllOrders = () => {
@@ -846,9 +894,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     title: string;
     message: string;
     type: NotificationType;
-    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
     userId?: string;
+    audience?: 'admin' | 'user';
+    recipientUid?: string | null;
+    localOnly?: boolean;
   }) => {
+    const audience = data.audience || 'admin';
+    const recipientUid = data.recipientUid ?? null;
+
+    // No guarda una notificación 'user' sin recipientUid
+    if (audience === 'user' && !recipientUid && !data.localOnly) {
+      return;
+    }
+
     const newNotif: AppNotification = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       title: data.title,
@@ -857,20 +916,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       read: false,
       linkTab: data.linkTab,
       userId: data.userId || 'all',
+      audience,
+      recipientUid,
       createdAt: new Date().toISOString(),
     };
 
-    // 1. Play sound, vibrate, and show system push notification
-    triggerPushOnce(newNotif);
+    // Solo muestra el aviso en el dispositivo si corresponde a la sesión actual (o si localOnly es true)
+    const matchesCurrentSession =
+      Boolean(data.localOnly) ||
+      (audience === 'admin' && (isAdminUser || currentUser.role === 'admin')) ||
+      (audience === 'user' && recipientUid && (currentUser.uid === recipientUid || authUid === recipientUid));
 
-    // 2. Add to local state (newest first)
-    setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
-    lastSeenNotifIdsRef.current.add(newNotif.id);
+    if (matchesCurrentSession) {
+      triggerPushOnce(newNotif);
+      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+      lastSeenNotifIdsRef.current.add(newNotif.id);
+    }
 
-    // 3. Persist to Firestore
-    upsertNotificationFirestore(newNotif).catch((err) => {
-      console.warn('Firestore upsertNotification error:', err);
+    // Siempre guarda en Firestore salvo localOnly
+    if (!data.localOnly) {
+      upsertNotificationFirestore(newNotif).catch((err) => {
+        console.warn('Firestore upsertNotification error:', err);
+      });
+    }
+  };
+
+  const notifyAdmin = async (data: {
+    title: string;
+    message: string;
+    type: NotificationType;
+    linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
+  }) => {
+    return sendPushNotification({
+      ...data,
+      audience: 'admin',
+      recipientUid: null,
     });
+  };
+
+  const notifyCustomer = async (
+    uid: string | null | undefined,
+    data: {
+      title: string;
+      message: string;
+      type: NotificationType;
+      linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
+    }
+  ) => {
+    if (!uid) return;
+    return sendPushNotification({
+      ...data,
+      audience: 'user',
+      recipientUid: uid,
+    });
+  };
+
+  const updateOrderShipping = async (
+    orderId: string,
+    shippingUpdates: Partial<ShippingDetails>,
+    newStatus?: OrderStatus
+  ) => {
+    const target = orders.find((o) => o.id === orderId);
+    if (!target) return;
+
+    const mergedShipping: ShippingDetails = {
+      ...(target.shippingDetails || {}),
+      ...shippingUpdates,
+    };
+
+    const updatedOrder: Order = {
+      ...target,
+      shippingDetails: mergedShipping,
+      ...(newStatus ? { status: newStatus } : {}),
+    };
+
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder : o)));
+    await saveOrderFirestore(updatedOrder).catch((err) => console.warn('saveOrderFirestore error:', err));
+
+    if (newStatus && newStatus !== target.status) {
+      updateOrderStatus(orderId, newStatus);
+    }
   };
 
   const markNotificationAsRead = async (id: string) => {
@@ -907,6 +1032,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message: '¡Notificaciones push activadas correctamente! Recibirás avisos instantáneos de citas y pedidos en pantalla.',
       type: 'system_alert',
       linkTab: 'agenda',
+      localOnly: true,
+      audience: isAdminUser ? 'admin' : 'user',
+      recipientUid: currentUser.uid || null,
     });
   };
 
@@ -1242,13 +1370,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAppointments((prev) => [newAppointment, ...prev]);
 
-    // Send device and system push notification
-    sendPushNotification({
+    // Send push notification: notifyAdmin + notifyCustomer
+    notifyAdmin({
       title: '¡Nueva Cita Agendada!',
       message: `${data.customerName} reservó ${service.name} para el ${data.dateStr} a las ${data.timeStr}`,
       type: 'appointment_created',
       linkTab: 'agenda',
     });
+
+    if (currentUser.uid) {
+      notifyCustomer(currentUser.uid, {
+        title: 'Cita registrada',
+        message: `Tu cita #${appointmentNumber} para ${service.name} ha sido registrada con éxito.`,
+        type: 'appointment_created',
+        linkTab: 'agenda',
+      });
+    }
 
     return newAppointment;
   };
@@ -1269,8 +1406,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await runTransaction(db, async (transaction) => {
         const appRef = doc(db, 'appointments', id);
         transaction.update(appRef, { status: 'cancelada' });
-
-
       });
     } catch (txError) {
       console.warn('Error en transacción de cancelación:', txError);
@@ -1281,13 +1416,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((a) => (a.id === id ? { ...a, status: 'cancelada' } : a))
     );
 
-    // Send push notification for cancellation
-    sendPushNotification({
-      title: 'Cita Cancelada',
-      message: `La cita ${app.appointmentNumber} (${app.customerName}) ha sido cancelada.`,
-      type: 'appointment_cancelled',
-      linkTab: 'agenda',
-    });
+    // Send push notification for cancellation: gerente vs clienta
+    const isActingAsAdmin = isAdminUser || currentUser.role === 'admin';
+    if (isActingAsAdmin) {
+      if (app.customerUid) {
+        notifyCustomer(app.customerUid, {
+          title: 'Cita Cancelada',
+          message: `Tu cita #${app.appointmentNumber} (${app.serviceName}) ha sido cancelada por el spa.`,
+          type: 'appointment_cancelled',
+          linkTab: 'agenda',
+        });
+      }
+    } else {
+      notifyAdmin({
+        title: 'Cita Cancelada por Cliente',
+        message: `La cita #${app.appointmentNumber} (${app.customerName}) ha sido cancelada.`,
+        type: 'appointment_cancelled',
+        linkTab: 'agenda',
+      });
+    }
   };
 
   const getAvailableSlotsForDate = (
@@ -1463,16 +1610,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       () => {}
     );
 
-    // Subscribe to orders directly from database
-    const unsubOrders = subscribeOrders(
-      (remoteOrders) => {
-        if (!isMounted) return;
-        setOrders(remoteOrders);
-        setFirebaseSyncStatus('synced');
-      },
-      () => {}
-    );
-
     // Subscribe to promotional banners directly from database
     const unsubBanners = subscribeBanners(
       (remoteBanners) => {
@@ -1499,33 +1636,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setExceptions(remote);
     }, () => {});
 
-    const unsubAppointments = subscribeAppointments((remote) => {
-      if (!isMounted) return;
-      setAppointments(remote);
-    }, () => {});
-
     // Subscribe to services directly from database
     const unsubServices = subscribeServices((remote) => {
       if (!isMounted) return;
       if (remote.length > 0) {
         setServices(remote);
       }
-    }, () => {});
-
-    // Subscribe to notifications directly from database
-    const unsubNotifications = subscribeNotifications((remoteNotifs) => {
-      if (!isMounted) return;
-      setNotifications(remoteNotifs);
-
-      // Trigger push for unseen new incoming notifications
-      if (lastSeenNotifIdsRef.current.size > 0) {
-        remoteNotifs.forEach((n) => {
-          if (!lastSeenNotifIdsRef.current.has(n.id) && !n.read) {
-            triggerPushOnce(n);
-          }
-        });
-      }
-      lastSeenNotifIdsRef.current = new Set(remoteNotifs.map((n) => n.id));
     }, () => {});
 
     // Subscribe to business profile
@@ -1552,15 +1668,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('offline', handleOffline);
       unsubProducts();
       unsubIngredients();
-      unsubOrders();
       unsubBanners();
       unsubProfile();
       unsubProviders();
       unsubSchedule();
       unsubExceptions();
-      unsubAppointments();
       unsubServices();
-      unsubNotifications();
     };
   }, []);
 
@@ -1596,8 +1709,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
+  const [authUid, setAuthUid] = useState<string | null | undefined>(undefined);
+
   const isAdminUser = Boolean(
-    currentUser.isLoggedIn && (isUserAdminEmail(currentUser.email) || currentUser.role === 'admin')
+    currentUser.isLoggedIn && isUserAdminEmail(currentUser.email)
   );
 
   const [authLoading, setAuthLoading] = useState(false);
@@ -1608,12 +1723,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Subscribe to real-time Firebase Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setAuthUid(fbUser ? fbUser.uid : null);
       if (fbUser) {
         try {
           const profile = await getUserProfileFirestore(fbUser.uid);
-          const isEmailAdmin = isUserAdminEmail(fbUser.email);
-          const isDbAdmin = profile?.role === 'admin';
-          const isAuthorizedAdmin = isEmailAdmin || isDbAdmin;
+          const isAuthorizedAdmin = isUserAdminEmail(fbUser.email);
 
           // If authorized admin, preserve their preferred view (admin or client preview), default to 'admin'
           // If NOT an authorized admin, strictly force role to 'client'
@@ -1669,9 +1783,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, []);
 
+  // Scoped subscriptions for orders, appointments, and notifications
+  useEffect(() => {
+    // Si authUid es undefined (Auth no ha resuelto), no hace nada
+    if (authUid === undefined) {
+      return;
+    }
+
+    // Limpia orders, appointments y notifications al cambiar de sesión
+    setOrders([]);
+    setAppointments([]);
+    setNotifications([]);
+
+    // Si no hay sesión, no se suscribe a nada
+    if (!authUid) {
+      return;
+    }
+
+    // Si el perfil aún no sincronizó su UID con authUid, esperar
+    if (currentUser.uid !== authUid) {
+      return;
+    }
+
+    let isEffectMounted = true;
+    const isManager = Boolean(isAdminUser && currentUser.uid === authUid);
+
+    // 1. Pedidos: gerente sin filtro (isAll: true); clienta filtrado por authUid
+    const unsubOrders = subscribeOrders(
+      (remoteOrders) => {
+        if (!isEffectMounted) return;
+        setOrders(remoteOrders);
+        setFirebaseSyncStatus('synced');
+      },
+      () => {},
+      isManager ? undefined : authUid,
+      isManager ? true : false
+    );
+
+    // 2. Citas: gerente sin filtro (isAll: true); clienta filtrado por authUid
+    const unsubAppointments = subscribeAppointments(
+      (remoteApps) => {
+        if (!isEffectMounted) return;
+        setAppointments(remoteApps);
+      },
+      () => {},
+      isManager ? undefined : authUid,
+      isManager ? true : false
+    );
+
+    // 3. Notificaciones: gerente colección completa; clienta recipientUid == authUid
+    let initialLoadDone = false;
+    const unsubNotifs = subscribeNotifications(
+      (remoteNotifs) => {
+        if (!isEffectMounted) return;
+
+        // La gerente conserva solo las de audience 'admin'; la clienta solo las de recipientUid igual a su uid
+        const filtered = remoteNotifs.filter((n) => {
+          if (isManager) {
+            return n.audience === 'admin';
+          }
+          return n.recipientUid === authUid;
+        });
+
+        setNotifications(filtered);
+
+        // Dispara push solo para notificaciones nuevas no leídas (no en la carga inicial)
+        if (initialLoadDone) {
+          filtered.forEach((n) => {
+            if (!lastSeenNotifIdsRef.current.has(n.id) && !n.read) {
+              triggerPushOnce(n);
+            }
+          });
+        }
+
+        filtered.forEach((n) => lastSeenNotifIdsRef.current.add(n.id));
+        initialLoadDone = true;
+      },
+      () => {},
+      { isAdmin: isManager, uid: authUid }
+    );
+
+    return () => {
+      isEffectMounted = false;
+      unsubOrders();
+      unsubAppointments();
+      unsubNotifs();
+    };
+  }, [authUid, isAdminUser, currentUser.uid]);
+
   const switchRole = (role: UserRole) => {
     // Strictly prevent non-admins from switching to admin
-    const canAccessAdmin = currentUser.isLoggedIn && (isUserAdminEmail(currentUser.email) || currentUser.role === 'admin');
+    const canAccessAdmin = currentUser.isLoggedIn && isUserAdminEmail(currentUser.email);
     if (role === 'admin' && !canAccessAdmin) {
       console.warn('Acceso denegado: Solo el administrador asignado puede acceder al panel gerencial.');
       return;
@@ -1943,7 +2145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setCustomerTab('catalogo');
   };
-  const [adminTab, setAdminTab] = useState<'resumen' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda'>('resumen');
+  const [adminTab, setAdminTab] = useState<'resumen' | 'pedidos' | 'logistica' | 'inventario' | 'servicios' | 'catalogo' | 'banners' | 'configuracion' | 'agenda'>('resumen');
   const [customerTab, setCustomerTab] = useState<'catalogo' | 'pedidos' | 'perfil'>('catalogo');
 
   const openProductModal = (productId: string) => {
@@ -2094,6 +2296,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestPushPermission,
         updatePushPreferences,
         sendPushNotification,
+        notifyAdmin,
+        notifyCustomer,
+        updateOrderShipping,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         deleteNotification,

@@ -33,7 +33,7 @@ export const AdminSettings: React.FC = () => {
   const [currencyCode, setCurrencyCode] = useState(businessProfile.currencyCode);
   const [phone, setPhone] = useState(businessProfile.phone);
   const [address, setAddress] = useState(businessProfile.address);
-  const [customBackgroundColor, setCustomBackgroundColor] = useState(businessProfile.customBackgroundColor || '');
+
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   React.useEffect(() => {
@@ -45,7 +45,6 @@ export const AdminSettings: React.FC = () => {
     setCurrencyCode(businessProfile.currencyCode);
     setPhone(businessProfile.phone);
     setAddress(businessProfile.address);
-    setCustomBackgroundColor(businessProfile.customBackgroundColor || '');
   }, [businessProfile]);
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -59,7 +58,6 @@ export const AdminSettings: React.FC = () => {
       currencyCode: currencyCode.trim() || 'MXN',
       phone: phone.trim(),
       address: address.trim(),
-      customBackgroundColor: customBackgroundColor.trim(),
     });
 
     setSavedSuccess(true);
@@ -84,7 +82,7 @@ export const AdminSettings: React.FC = () => {
             <Palette className="w-4 h-4 text-slate-700" />
             Temas Visuales y Color de Fondo
           </h3>
-          <p className="text-xs text-slate-500">Selecciona un tema predefinido o define un color de fondo personalizado.</p>
+
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -130,38 +128,7 @@ export const AdminSettings: React.FC = () => {
           })}
         </div>
 
-        {/* Custom Background Color Picker */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h4 className="font-bold text-slate-900 text-xs sm:text-sm">Selector de Color de Fondo Personalizado</h4>
-            <p className="text-[11px] text-slate-500">Aplica un color de fondo personalizado que sobrescribirá el fondo actual de la app.</p>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="color"
-              value={customBackgroundColor || '#faf6ee'}
-              onChange={(e) => setCustomBackgroundColor(e.target.value)}
-              className="w-10 h-10 rounded-xl cursor-pointer border border-slate-300 p-0.5 bg-white shrink-0"
-              title="Elegir color"
-            />
-            <input
-              type="text"
-              placeholder="#faf6ee"
-              value={customBackgroundColor}
-              onChange={(e) => setCustomBackgroundColor(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono w-32 focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            {customBackgroundColor && (
-              <button
-                type="button"
-                onClick={() => setCustomBackgroundColor('')}
-                className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-2 bg-rose-50 rounded-lg border border-rose-200 shrink-0"
-              >
-                Restaurar
-              </button>
-            )}
-          </div>
-        </div>
+
       </div>
 
       {/* BUSINESS PROFILE CONFIGURATION FORM */}

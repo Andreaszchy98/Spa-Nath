@@ -272,9 +272,7 @@ export const AdminInventory: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-900">
             Gestión de Inventario & Fichas Técnicas
           </h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-            Catálogo central de insumos y cosméticos, deducción automática al registrar ventas y control de fichas técnicas multirrelacionales.
-          </p>
+
         </div>
 
         {/* Global stock control toggle */}

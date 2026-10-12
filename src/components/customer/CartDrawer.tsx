@@ -16,6 +16,8 @@ import {
   Store,
   MapPin,
   Clock,
+  Truck,
+  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -32,14 +34,18 @@ export const CartDrawer: React.FC = () => {
     currentUser,
     createOrder,
     setCustomerTab,
+    setIsPrivacyModalOpen,
     theme,
   } = useApp();
 
   // Checkout form state
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [orderType, setOrderType] = useState<'domicilio' | 'recoger'>('recoger');
   const [customerName, setCustomerName] = useState(currentUser.name || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser.phone || '');
+  const [customerAddress, setCustomerAddress] = useState(currentUser.address || '');
   const [customerNotes, setCustomerNotes] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -51,7 +57,10 @@ export const CartDrawer: React.FC = () => {
     if (currentUser.phone && !customerPhone) {
       setCustomerPhone(currentUser.phone);
     }
-  }, [currentUser.name, currentUser.phone]);
+    if (currentUser.address && !customerAddress) {
+      setCustomerAddress(currentUser.address);
+    }
+  }, [currentUser.name, currentUser.phone, currentUser.address]);
 
   if (!isCartDrawerOpen) return null;
 
@@ -72,6 +81,14 @@ export const CartDrawer: React.FC = () => {
       setCheckoutError('Por favor ingresa tu nombre y teléfono de contacto.');
       return;
     }
+    if (orderType === 'domicilio' && !customerAddress.trim()) {
+      setCheckoutError('Por favor ingresa tu dirección para el envío a domicilio.');
+      return;
+    }
+    if (!privacyAccepted) {
+      setCheckoutError('Debes aceptar el Aviso de Privacidad para continuar.');
+      return;
+    }
     if (isCashInsufficient) {
       setCheckoutError(`El monto en efectivo debe cubrir el total (${businessProfile.currency}${grandTotal}).`);
       return;
@@ -80,7 +97,10 @@ export const CartDrawer: React.FC = () => {
     const newOrder = createOrder({
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
+      customerAddress: orderType === 'domicilio' ? customerAddress.trim() : undefined,
+      orderType,
       customerNotes: customerNotes.trim() || undefined,
+      privacyAcceptedAt: new Date().toISOString(),
       items: cart,
       subtotal: cartTotal,
       total: grandTotal,
@@ -181,20 +201,15 @@ export const CartDrawer: React.FC = () => {
               </button>
             </div>
           ) : isCheckingOut ? (
-            /* Checkout Form (Solo para recoger en tienda / pickup) */
+            /* Checkout Form (Envío a domicilio o retiro en tienda) */
             <form id="checkout-form" onSubmit={handlePlaceOrder} className="space-y-4">
-              {/* Pickup Mode Notice */}
+              {/* Pickup in-spa modality notice */}
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
                 <Store className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 font-bold text-blue-950">
-                    <span>Modalidad de Pedido: Para Recoger</span>
-                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-blue-200 text-blue-800 font-extrabold uppercase">
-                      Exclusivo
-                    </span>
-                  </div>
+                  <span className="font-bold text-blue-950 block">Retiro y Pago en Mostrador del Spa</span>
                   <p className="text-[11px] text-blue-800 leading-relaxed">
-                    Preparamos tu orden en nuestro establecimiento y estará lista para su retiro en:
+                    Preparamos tu orden y estará lista para su entrega y pago en efectivo en nuestro establecimiento:
                   </p>
                   <p className="text-[11px] font-semibold text-blue-950 flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 shrink-0 text-blue-600" />
@@ -245,9 +260,28 @@ export const CartDrawer: React.FC = () => {
                   </div>
                 </div>
 
+                {orderType === 'domicilio' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Dirección de Entrega y Referencias *
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                      <textarea
+                        rows={2}
+                        required
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        placeholder="Calle, número, colonia, código postal y entrecalles o referencias para el repartidor..."
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Hora estimada de recogida o notas
+                    {orderType === 'recoger' ? 'Hora estimada de recogida o notas' : 'Notas adicionales para el pedido'}
                   </label>
                   <div className="relative">
                     <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -255,10 +289,34 @@ export const CartDrawer: React.FC = () => {
                       rows={2}
                       value={customerNotes}
                       onChange={(e) => setCustomerNotes(e.target.value)}
-                      placeholder="Ej: Paso a recoger a las 2:30pm, empacar para llevar..."
+                      placeholder={orderType === 'recoger' ? 'Ej: Paso a las 3:00pm, empacar para regalo...' : 'Ej: Tocar timbre blanco, dejar con caseta...'}
                       className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>
+                </div>
+
+                {/* Privacy Consent Checkbox */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={privacyAccepted}
+                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 shrink-0"
+                    />
+                    <span className="leading-relaxed">
+                      He leído el{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsPrivacyModalOpen(true)}
+                        className="text-indigo-600 font-bold underline hover:text-indigo-800"
+                      >
+                        Aviso de Privacidad
+                      </button>{' '}
+                      y acepto el tratamiento de mis datos para gestionar mis citas y pedidos. *
+                    </span>
+                  </label>
                 </div>
               </div>
 
@@ -442,9 +500,9 @@ export const CartDrawer: React.FC = () => {
                 <button
                   type="submit"
                   form="checkout-form"
-                  disabled={isCashInsufficient}
+                  disabled={isCashInsufficient || !privacyAccepted}
                   className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 ${
-                    isCashInsufficient ? 'bg-slate-400 text-white cursor-not-allowed' : theme.buttonClass
+                    isCashInsufficient || !privacyAccepted ? 'bg-slate-400 text-white cursor-not-allowed opacity-70' : theme.buttonClass
                   }`}
                 >
                   <span>Confirmar Pedido (Efectivo)</span>

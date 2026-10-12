@@ -98,9 +98,7 @@ export const AdminBanners: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-900">
             Banners de Anuncios, Patrocinios & Promociones
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configura anuncios que dirigen al cliente a ver un producto específico del catálogo al hacer clic.
-          </p>
+
         </div>
 
         <button

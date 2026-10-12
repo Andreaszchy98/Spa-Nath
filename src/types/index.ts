@@ -160,21 +160,37 @@ export interface CashPaymentDetail {
   changeNeeded: number; // Cambio que se debe dar
 }
 
+export interface ShippingDetails {
+  carrierName?: string; // ej. 'Reparto Propio', 'MotoEnvío Express', 'DHL', 'FedEx', 'Estafeta'
+  trackingNumber?: string; // Guía de rastreo
+  driverName?: string; // Nombre del repartidor
+  driverPhone?: string; // Teléfono del repartidor
+  dispatchedAt?: string; // Fecha y hora de despacho
+  estimatedDelivery?: string; // Estimado de entrega
+  deliveredAt?: string; // Fecha de entrega efectiva
+  notes?: string; // Notas de entrega / referencias
+}
+
 export interface Order {
   id: string;
   orderNumber: string; // e.g. "PED-108"
-  orderType?: 'recoger'; // Exclusivo: solo para recoger en local / pickup
+  orderType?: 'recoger' | 'domicilio'; // Recoger en local o entrega a domicilio
   customerName: string;
   customerPhone: string;
+  customerAddress?: string; // Dirección para envío / reparto
   customerNotes?: string;
   customerUid?: string | null;
+  privacyAcceptedAt?: string;
+  healthConsent?: boolean;
   items: CartItem[];
   subtotal: number;
+  shippingFee?: number; // Costo de flete / envío
   total: number;
   paymentMethod: 'efectivo';
   cashPayment: CashPaymentDetail;
   paymentReceived: boolean; // Marcar cobrado
   status: OrderStatus;
+  shippingDetails?: ShippingDetails;
   createdAt: string;
 }
 
@@ -296,8 +312,10 @@ export interface AppNotification {
   message: string;
   type: NotificationType;
   read: boolean;
-  linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo';
+  linkTab?: 'agenda' | 'pedidos' | 'inventario' | 'servicios' | 'catalogo' | 'logistica';
   createdAt: string;
+  audience: 'admin' | 'user';
+  recipientUid: string | null;
 }
 
 export interface PushPreferences {
