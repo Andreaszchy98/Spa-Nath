@@ -23,11 +23,23 @@ export const CustomerOrdersHistory: React.FC = () => {
   const { orders, appointments, updateAppointmentStatus, updateOrderStatus, businessProfile, theme, setCustomerTab, addToCart, currentUser } = useApp();
   
   const clientOrders = orders.filter((o) => {
-    if (currentUser.uid) return o.customerUid === currentUser.uid;
+    if (currentUser.uid) {
+      if (o.customerUid === currentUser.uid) return true;
+      if (!o.customerUid && ((currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name))) {
+        return true;
+      }
+      return false;
+    }
     return (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name);
   });
   const clientAppointments = appointments.filter((a) => {
-    if (currentUser.uid) return a.customerUid === currentUser.uid;
+    if (currentUser.uid) {
+      if (a.customerUid === currentUser.uid) return true;
+      if (!a.customerUid && ((currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name))) {
+        return true;
+      }
+      return false;
+    }
     return (currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name);
   });
 
@@ -218,29 +230,38 @@ export const CustomerOrdersHistory: React.FC = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 pt-2 sm:pt-0">
                       <button
+                        type="button"
                         onClick={() => setTicketOrder(order)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+                        className="px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-2xs hover:brightness-95 active:scale-95"
+                        style={{
+                          backgroundColor: `${theme.raw.primaryBtn}12`,
+                          borderColor: `${theme.raw.primaryBtn}35`,
+                          color: theme.raw.primaryBtn,
+                          borderWidth: '1px',
+                        }}
                       >
                         <Receipt className="w-3.5 h-3.5" />
                         <span>Comprobante Digital</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleRepeatOrder(order)}
-                        className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+                        className={`px-3.5 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 ${theme.buttonClass}`}
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
+                        <RotateCcw className="w-3.5 h-3.5" />
                         <span>Pedir de nuevo</span>
                       </button>
                       {order.status === 'pendiente' && (
                         <button
+                          type="button"
                           onClick={() => {
                             if (window.confirm('¿Confirmas que deseas cancelar este pedido? Se liberará el stock automáticamente.')) {
                               updateOrderStatus(order.id, 'cancelado');
                             }
                           }}
-                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-rose-200"
+                          className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all border border-rose-200 active:scale-95"
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Cancelar pedido</span>
@@ -418,12 +439,13 @@ export const CustomerOrdersHistory: React.FC = () => {
 
                       return canCancel ? (
                         <button
+                          type="button"
                           onClick={() => {
                             if (window.confirm('¿Confirmas que deseas cancelar esta cita?')) {
                               updateAppointmentStatus(app.id, 'cancelada');
                             }
                           }}
-                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold transition-colors"
+                          className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all border border-rose-200 active:scale-95"
                         >
                           Cancelar Cita
                         </button>

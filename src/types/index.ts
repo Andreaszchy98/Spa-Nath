@@ -284,6 +284,8 @@ export interface CurrentUser {
   photoUrl?: string;
   isLoggedIn?: boolean;
   authProvider?: 'google' | 'password' | 'guest';
+  privacyAcceptedAt?: string;
+  healthConsent?: boolean;
 }
 
 export interface BusySlot {
@@ -291,7 +293,6 @@ export interface BusySlot {
   providerId: string;
   startTimeUtc: string;
   endTimeUtc: string;
-  appointmentId: string;
 }
 
 export interface UserProfile {
@@ -304,6 +305,8 @@ export interface UserProfile {
   role: UserRole;
   createdAt?: string;
   updatedAt?: string;
+  privacyAcceptedAt?: string;
+  healthConsent?: boolean;
 }
 
 export type NotificationType =

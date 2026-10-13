@@ -67,7 +67,13 @@ export const CustomerProfileView: React.FC = () => {
 
   // Orders statistics for this customer
   const clientOrders = orders.filter((o) => {
-    if (currentUser.uid) return o.customerUid === currentUser.uid;
+    if (currentUser.uid) {
+      if (o.customerUid === currentUser.uid) return true;
+      if (!o.customerUid && ((currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name))) {
+        return true;
+      }
+      return false;
+    }
     return (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name);
   });
   const activeOrders = clientOrders.filter(
@@ -76,7 +82,13 @@ export const CustomerProfileView: React.FC = () => {
 
   // Appointments statistics
   const clientAppointments = appointments.filter((a) => {
-    if (currentUser.uid) return a.customerUid === currentUser.uid;
+    if (currentUser.uid) {
+      if (a.customerUid === currentUser.uid) return true;
+      if (!a.customerUid && ((currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name))) {
+        return true;
+      }
+      return false;
+    }
     return (currentUser.phone && a.customerPhone === currentUser.phone) || (currentUser.name && a.customerName === currentUser.name);
   });
 

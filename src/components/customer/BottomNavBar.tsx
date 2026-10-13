@@ -6,11 +6,12 @@ export const BottomNavBar: React.FC = () => {
   const { customerTab, setCustomerTab, orders, currentUser, theme } = useApp();
 
   // Active orders count for customer badge (only orders created by or for this client)
-  const activeOrdersCount = orders.filter(
-    (o) =>
-      o.customerPhone === currentUser.phone &&
-      (o.status === 'pendiente' || o.status === 'en_preparacion')
-  ).length;
+  const activeOrdersCount = orders.filter((o) => {
+    const isOwner = currentUser.uid
+      ? o.customerUid === currentUser.uid || (!o.customerUid && ((currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name)))
+      : (currentUser.phone && o.customerPhone === currentUser.phone) || (currentUser.name && o.customerName === currentUser.name);
+    return isOwner && (o.status === 'pendiente' || o.status === 'en_preparacion' || o.status === 'en_ruta');
+  }).length;
 
   const navItems = [
     {

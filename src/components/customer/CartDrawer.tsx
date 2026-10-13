@@ -32,6 +32,7 @@ export const CartDrawer: React.FC = () => {
     cartTotal,
     businessProfile,
     currentUser,
+    updateCurrentUser,
     createOrder,
     setCustomerTab,
     setIsPrivacyModalOpen,
@@ -44,24 +45,36 @@ export const CartDrawer: React.FC = () => {
   const [orderType, setOrderType] = useState<'domicilio' | 'recoger'>('recoger');
   const [customerName, setCustomerName] = useState(currentUser.name || '');
   const [customerPhone, setCustomerPhone] = useState(currentUser.phone || '');
+  const [savePhoneToProfile, setSavePhoneToProfile] = useState<boolean>(true);
   const [customerAddress, setCustomerAddress] = useState(currentUser.address || '');
   const [customerNotes, setCustomerNotes] = useState('');
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(Boolean(currentUser?.privacyAcceptedAt));
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  const lastUserUidRef = React.useRef(currentUser.uid);
+
   React.useEffect(() => {
-    if (currentUser.name && !customerName) {
-      setCustomerName(currentUser.name);
+    if (lastUserUidRef.current !== currentUser.uid) {
+      lastUserUidRef.current = currentUser.uid;
+      setCustomerName(currentUser.name || '');
+      setCustomerPhone(currentUser.phone || '');
+      setCustomerAddress(currentUser.address || '');
+      setPrivacyAccepted(Boolean(currentUser?.privacyAcceptedAt));
+      setCheckoutError(null);
+      setIsCheckingOut(false);
     }
-    if (currentUser.phone && !customerPhone) {
-      setCustomerPhone(currentUser.phone);
+  }, [currentUser.uid, currentUser.name, currentUser.phone, currentUser.address, currentUser.privacyAcceptedAt]);
+
+  React.useEffect(() => {
+    if (isCartDrawerOpen && !isCheckingOut) {
+      setCustomerName(currentUser.name || '');
+      setCustomerPhone(currentUser.phone || '');
+      setCustomerAddress(currentUser.address || '');
+      setPrivacyAccepted(Boolean(currentUser?.privacyAcceptedAt));
     }
-    if (currentUser.address && !customerAddress) {
-      setCustomerAddress(currentUser.address);
-    }
-  }, [currentUser.name, currentUser.phone, currentUser.address]);
+  }, [isCartDrawerOpen, isCheckingOut, currentUser.name, currentUser.phone, currentUser.address, currentUser.privacyAcceptedAt]);
 
   if (!isCartDrawerOpen) return null;
 
@@ -122,6 +135,23 @@ export const CartDrawer: React.FC = () => {
 
     setConfirmedOrderId(newOrder.orderNumber);
     clearCart();
+
+    // Guardar teléfono, nombre y dirección en el perfil del cliente para reutilizar en futuras compras/citas
+    if (savePhoneToProfile && currentUser.isLoggedIn) {
+      const updates: Partial<typeof currentUser> = {};
+      if (customerPhone.trim() && customerPhone.trim() !== currentUser.phone) {
+        updates.phone = customerPhone.trim();
+      }
+      if (customerName.trim() && (!currentUser.name || currentUser.name === 'Cliente')) {
+        updates.name = customerName.trim();
+      }
+      if (customerAddress.trim() && customerAddress.trim() !== currentUser.address) {
+        updates.address = customerAddress.trim();
+      }
+      if (Object.keys(updates).length > 0) {
+        updateCurrentUser(updates);
+      }
+    }
   };
 
   const handleFinishAndTrack = () => {
@@ -265,6 +295,17 @@ export const CartDrawer: React.FC = () => {
                       className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
                     />
                   </div>
+                  {currentUser.isLoggedIn && (
+                    <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 select-none mt-1.5">
+                      <input
+                        type="checkbox"
+                        checked={savePhoneToProfile}
+                        onChange={(e) => setSavePhoneToProfile(e.target.checked)}
+                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                      />
+                      <span>Guardar este número en mis datos de contacto para futuras compras</span>
+                    </label>
+                  )}
                 </div>
 
                 {orderType === 'domicilio' && (
@@ -304,26 +345,33 @@ export const CartDrawer: React.FC = () => {
 
                 {/* Privacy Consent Checkbox */}
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
-                    <input
-                      type="checkbox"
-                      required
-                      checked={privacyAccepted}
-                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 shrink-0"
-                    />
-                    <span className="leading-relaxed">
-                      He leído el{' '}
-                      <button
-                        type="button"
-                        onClick={() => setIsPrivacyModalOpen(true)}
-                        className="text-indigo-600 font-bold underline hover:text-indigo-800"
-                      >
-                        Aviso de Privacidad
-                      </button>{' '}
-                      y acepto el tratamiento de mis datos para gestionar mis citas y pedidos. *
-                    </span>
-                  </label>
+                  {currentUser.privacyAcceptedAt ? (
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Aviso de Privacidad aceptado previamente.</span>
+                    </div>
+                  ) : (
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={privacyAccepted}
+                        onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 shrink-0"
+                      />
+                      <span className="leading-relaxed">
+                        He leído el{' '}
+                        <button
+                          type="button"
+                          onClick={() => setIsPrivacyModalOpen(true)}
+                          className="text-indigo-600 font-bold underline hover:text-indigo-800"
+                        >
+                          Aviso de Privacidad
+                        </button>{' '}
+                        y acepto el tratamiento de mis datos. *
+                      </span>
+                    </label>
+                  )}
                 </div>
               </div>
 
@@ -519,7 +567,18 @@ export const CartDrawer: React.FC = () => {
             ) : (
               <button
                 type="button"
-                onClick={() => setIsCheckingOut(true)}
+                onClick={() => {
+                  if (!currentUser.isLoggedIn) {
+                    setIsAuthModalOpen(true);
+                    return;
+                  }
+                  setCustomerName(currentUser.name || '');
+                  setCustomerPhone(currentUser.phone || '');
+                  setCustomerAddress(currentUser.address || '');
+                  setPrivacyAccepted(Boolean(currentUser?.privacyAcceptedAt));
+                  setCheckoutError(null);
+                  setIsCheckingOut(true);
+                }}
                 className={`w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 ${theme.buttonClass}`}
               >
                 <span>Proceder al Pago en Efectivo</span>

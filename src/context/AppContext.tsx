@@ -60,6 +60,7 @@ import {
   deleteIngredientFirestore,
   saveOrderFirestore,
   updateOrderStatusFirestore,
+  updateOrderCustomerUidFirestore,
   deleteOrderFirestore,
   upsertBannerFirestore,
   deleteBannerFirestore,
@@ -626,30 +627,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       throw new Error('Debes iniciar sesión para realizar pedidos.');
     }
-    const orderNumber = `PED-${Date.now().toString().slice(-5)}${Math.floor(100 + Math.random() * 900)}`;
-    const newOrder: Order = {
-      ...orderData,
-      id: `ord-${Date.now()}`,
-      orderNumber,
-      customerUid: currentUser.uid || null,
-      orderType: orderData.orderType || 'recoger',
-      customerAddress: orderData.customerAddress || currentUser.address || '',
-      createdAt: new Date().toISOString(),
-    };
 
-    // 1. Deduct direct finished product stock
+    // Validate product stock availability
     orderData.items.forEach((item) => {
-      adjustStock(item.productId, -item.quantity);
+      const prod = products.find((p) => p.id === item.productId);
+      if (!prod) {
+        throw new Error(`Producto no encontrado en el catálogo.`);
+      }
+      if (prod.stock < item.quantity) {
+        throw new Error(`No hay suficiente stock para "${prod.name}". Disponibles: ${prod.stock}, solicitados: ${item.quantity}.`);
+      }
     });
 
-    // 2. Relación Many-to-Many: Descontar stock central de ingredientes según la receta
+    // Calculate ingredient deductions first to validate ingredient stock
     const ingredientDeductions: Record<string, number> = {};
-
     orderData.items.forEach((cartItem) => {
       const prod = products.find((p) => p.id === cartItem.productId);
       if (!prod) return;
 
-      // A) Ingredientes de la receta base del producto
       if (prod.recipe && prod.recipe.length > 0) {
         prod.recipe.forEach((recipeItem) => {
           const totalReq = recipeItem.quantity * cartItem.quantity;
@@ -658,7 +653,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
-      // B) Ingredientes adicionales vinculados a opciones seleccionadas
       if (cartItem.selectedOptions && cartItem.selectedOptions.length > 0) {
         cartItem.selectedOptions.forEach((selectedOpt) => {
           for (const group of prod.optionGroups || []) {
@@ -673,6 +667,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
     });
+
+    Object.entries(ingredientDeductions).forEach(([ingId, requiredQty]) => {
+      const ing = ingredients.find((i) => i.id === ingId);
+      if (ing && ing.stock < requiredQty) {
+        throw new Error(`Stock insuficiente del ingrediente "${ing.name}". Requeridos: ${requiredQty}, disponibles: ${ing.stock}.`);
+      }
+    });
+
+    const orderNumber = `PED-${Date.now().toString().slice(-5)}${Math.floor(100 + Math.random() * 900)}`;
+    const effectiveCustomerUid = auth.currentUser?.uid || currentUser.uid || null;
+    const newOrder: Order = {
+      ...orderData,
+      id: `ord-${Date.now()}`,
+      orderNumber,
+      customerUid: effectiveCustomerUid,
+      orderType: orderData.orderType || 'recoger',
+      customerAddress: orderData.customerAddress || currentUser.address || '',
+      privacyAcceptedAt: orderData.privacyAcceptedAt || currentUser.privacyAcceptedAt || new Date().toISOString(),
+      healthConsent: orderData.healthConsent ?? currentUser.healthConsent ?? false,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Deduct direct finished product stock
+    orderData.items.forEach((item) => {
+      adjustStock(item.productId, -item.quantity);
+    });
+
+    // 2. Relación Many-to-Many: Descontar stock central de ingredientes según la receta (ingredientDeductions already computed above)
 
     // Aplicar los descuentos al catálogo central de ingredientes
     if (Object.keys(ingredientDeductions).length > 0) {
@@ -1344,7 +1366,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const deadlineMs = Math.min(now.getTime() + deadlineMinutes * 60 * 1000, startDate.getTime());
     const providerResponseDeadlineUtc = new Date(deadlineMs).toISOString();
 
+    const targetProviderId = data.providerId || provider?.id || 'prov-1';
+    const newStartMs = startDate.getTime();
+    const newEndMs = endDate.getTime();
+
+    const hasOverlap = appointments.some((app) => {
+      if (app.status === 'cancelada') return false;
+      if (app.providerId !== targetProviderId) return false;
+      const existingStart = new Date(app.startTimeUtc).getTime();
+      const existingEnd = new Date(app.endTimeUtc).getTime();
+      return newStartMs < existingEnd && existingStart < newEndMs;
+    });
+
+    if (hasOverlap) {
+      throw new Error('Este horario ya ha sido reservado por otra clienta. Por favor elige otro horario disponible.');
+    }
+
     const appointmentNumber = `CITA-${Date.now().toString().slice(-5)}${Math.floor(100 + Math.random() * 900)}`;
+    const effectiveCustomerUid = auth.currentUser?.uid || currentUser.uid || null;
 
     const newAppointmentRef = doc(collection(db, 'appointments'));
     const newAppointment: Appointment = {
@@ -1358,9 +1397,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerPhone: data.customerPhone,
       customerNotes: data.customerNotes || '',
       customerAddress: data.customerAddress || '',
-      customerUid: currentUser.uid || null,
-      privacyAcceptedAt: data.privacyAcceptedAt || new Date().toISOString(),
-      healthConsent: Boolean(data.healthConsent),
+      customerUid: effectiveCustomerUid,
+      privacyAcceptedAt: data.privacyAcceptedAt || currentUser.privacyAcceptedAt || new Date().toISOString(),
+      healthConsent: Boolean(data.healthConsent ?? currentUser.healthConsent),
       modality: appointmentModality,
       travelDistanceKm: Number((appointmentModality === 'domicilio' && servObj) ? servObj.maxHomeZoneKm || 0 : 0),
       travelSurcharge: Number((appointmentModality === 'domicilio' && servObj) ? servObj.travelSurcharge || 0 : 0),
@@ -1384,7 +1423,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         providerId: newAppointment.providerId,
         startTimeUtc: newAppointment.startTimeUtc,
         endTimeUtc: newAppointment.endTimeUtc,
-        appointmentId: newAppointment.id,
       };
       await upsertBusySlotFirestore(busySlot);
     } catch (saveError) {
@@ -1785,17 +1823,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             : 'client';
 
           setCurrentUser((prev) => {
+            const isSameUser = Boolean(prev.uid && prev.uid === fbUser.uid);
+            const defaultName = isAuthorizedAdmin ? 'Administrador' : (fbUser.displayName || 'Cliente');
             const updated: CurrentUser = {
               role: assignedRole,
-              name: profile?.displayName || fbUser.displayName || prev.name || (isAuthorizedAdmin ? 'Administrador' : 'Cliente'),
+              name: profile?.displayName || fbUser.displayName || (isSameUser ? prev.name : '') || defaultName,
               email: fbUser.email || '',
               emailVerified,
-              phone: profile?.phone || fbUser.phoneNumber || prev.phone || '',
-              address: profile?.address || prev.address || '',
+              phone: profile?.phone || fbUser.phoneNumber || (isSameUser ? prev.phone : '') || '',
+              address: profile?.address || (isSameUser ? prev.address : '') || '',
               uid: fbUser.uid,
               photoUrl: fbUser.photoURL || profile?.photoURL || undefined,
               isLoggedIn: true,
               authProvider: fbUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
+              privacyAcceptedAt: profile?.privacyAcceptedAt || (isSameUser ? prev.privacyAcceptedAt : undefined),
+              healthConsent: profile?.healthConsent !== undefined ? profile.healthConsent : (isSameUser ? (prev.healthConsent || false) : false),
             };
             try {
               localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
@@ -1821,7 +1863,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             authProvider: 'guest',
           };
           try {
-            localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
+            localStorage.removeItem('bl_current_user_profile');
             localStorage.setItem(STORAGE_KEYS.ROLE, 'client');
           } catch (_) {}
           return updated;
@@ -1863,6 +1905,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!isEffectMounted) return;
         setOrders(remoteOrders);
         setFirebaseSyncStatus('synced');
+
+        // Backfill legacy orders created without customerUid if matching currentUser
+        if (isManager && remoteOrders.length > 0 && currentUser.uid) {
+          remoteOrders.forEach((ord) => {
+            if (!ord.customerUid && ord.customerName && ord.customerName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) {
+              updateOrderCustomerUidFirestore(ord.id, currentUser.uid!).catch(() => {});
+            }
+          });
+        }
       },
       () => {},
       isManager ? undefined : authUid,
@@ -1889,14 +1940,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isManager && appointments.length > 0) {
           appointments.forEach(app => {
             if (app.status !== 'cancelada') {
-              const exists = remoteSlots.some(b => b.appointmentId === app.id);
+              const exists = remoteSlots.some(b => b.id === app.id);
               if (!exists) {
                 upsertBusySlotFirestore({
                   id: app.id,
                   providerId: app.providerId,
                   startTimeUtc: app.startTimeUtc,
                   endTimeUtc: app.endTimeUtc,
-                  appointmentId: app.id,
                 }).catch(() => {});
               }
             }
@@ -1980,6 +2030,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           displayName: updated.name,
           phone: updated.phone,
           address: updated.address,
+          privacyAcceptedAt: updated.privacyAcceptedAt,
+          healthConsent: updated.healthConsent,
         }).catch((e) => console.warn('Sync profile Firestore error:', e));
       }
       return updated;
@@ -2092,6 +2144,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthError(null);
     try {
       await logoutUser();
+      localStorage.removeItem('bl_current_user_profile');
+      setCurrentUser({
+        role: 'client',
+        name: '',
+        phone: '',
+        address: '',
+        email: undefined,
+        emailVerified: false,
+        uid: undefined,
+        photoUrl: undefined,
+        isLoggedIn: false,
+        authProvider: 'guest',
+        privacyAcceptedAt: undefined,
+        healthConsent: false,
+      });
     } catch (err: any) {
       console.error('Logout error:', err);
     } finally {
@@ -2185,7 +2252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }, { merge: true });
       } catch (e) {}
     }
-    setBusySlots((prev) => prev.filter((b) => !userApps.some((a) => a.id === b.appointmentId)));
+    setBusySlots((prev) => prev.filter((b) => !userApps.some((a) => a.id === b.id)));
 
     const userOrders = orders.filter((o) => o.customerUid === uid || (currentUser.phone && o.customerPhone === currentUser.phone));
     for (const ord of userOrders) {

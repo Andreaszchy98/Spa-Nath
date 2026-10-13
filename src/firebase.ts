@@ -291,25 +291,41 @@ export function subscribeOrders(
 export async function saveOrderFirestore(order: Order): Promise<void> {
   const path = `orders/${order.id}`;
   try {
-    const payload = {
+    const effectiveUid = order.customerUid || auth.currentUser?.uid || null;
+    const payload = cleanObject({
       id: order.id,
       orderNumber: order.orderNumber,
       orderType: order.orderType || 'recoger',
       customerName: order.customerName,
       customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress || '',
       customerNotes: order.customerNotes || '',
+      customerUid: effectiveUid,
+      privacyAcceptedAt: order.privacyAcceptedAt || new Date().toISOString(),
+      healthConsent: Boolean(order.healthConsent),
       items: order.items || [],
       subtotal: Number(order.subtotal) || 0,
+      shippingFee: Number(order.shippingFee) || 0,
       total: Number(order.total) || 0,
       paymentMethod: order.paymentMethod || 'efectivo',
       cashPayment: order.cashPayment || { amountPaid: 0, changeNeeded: 0 },
       paymentReceived: Boolean(order.paymentReceived),
       status: order.status || 'pendiente',
-      createdAt: order.createdAt,
-    };
+      shippingDetails: order.shippingDetails || undefined,
+      createdAt: order.createdAt || new Date().toISOString(),
+    });
     await setDoc(doc(db, 'orders', order.id), payload);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+export async function updateOrderCustomerUidFirestore(orderId: string, customerUid: string): Promise<void> {
+  const path = `orders/${orderId}`;
+  try {
+    await setDoc(doc(db, 'orders', orderId), { customerUid }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 
@@ -610,7 +626,11 @@ export function subscribeAppointments(
 export async function saveAppointmentFirestore(app: Appointment): Promise<void> {
   const path = `appointments/${app.id}`;
   try {
-    const cleaned = cleanObject(app);
+    const effectiveUid = app.customerUid || auth.currentUser?.uid || null;
+    const cleaned = cleanObject({
+      ...app,
+      customerUid: effectiveUid,
+    });
     await setDoc(doc(db, 'appointments', app.id), cleaned);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
@@ -678,7 +698,6 @@ export async function upsertBusySlotFirestore(slot: BusySlot): Promise<void> {
       providerId: slot.providerId,
       startTimeUtc: slot.startTimeUtc,
       endTimeUtc: slot.endTimeUtc,
-      appointmentId: slot.appointmentId,
     });
     await setDoc(doc(db, 'busy_slots', slot.id), cleaned);
   } catch (error) {
@@ -912,6 +931,8 @@ export async function registerWithEmail(email: string, pass: string, displayName
       uid: result.user.uid,
       email: result.user.email || email,
       displayName: displayName.trim() || (isAdmin ? 'Administrador' : 'Cliente'),
+      phone: '',
+      address: '',
       role: isAdmin ? 'admin' : 'client',
       createdAt: new Date().toISOString(),
     });

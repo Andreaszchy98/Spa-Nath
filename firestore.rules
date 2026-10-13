@@ -96,17 +96,17 @@ service cloud.firestore {
              data.endTimeUtc is string && data.endTimeUtc.size() <= 50;
     }
 
-    // Products collection: Only manager (admin) can modify catalog
+    // Products collection: Manager can modify catalog; signed-in users can decrement stock on purchase
     match /products/{productId} {
       allow get, list: if true;
-      allow create, update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow create, update: if (isAdmin() || (isSignedIn() && incoming().stock <= existing().stock && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))) && isValidId(productId) && isValidProduct(incoming());
       allow delete: if isAdmin() && isValidId(productId);
     }
 
-    // Ingredients collection: Only manager (admin) can modify inventory
+    // Ingredients collection: Manager can modify inventory; signed-in users can decrement stock on purchase
     match /ingredients/{ingredientId} {
       allow get, list: if true;
-      allow create, update: if isAdmin() && isValidId(ingredientId) && isValidIngredient(incoming());
+      allow create, update: if (isAdmin() || (isSignedIn() && incoming().stock <= existing().stock && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))) && isValidId(ingredientId) && isValidIngredient(incoming());
       allow delete: if isAdmin() && isValidId(ingredientId);
     }
 
@@ -178,19 +178,16 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
     }
 
-    // Busy slots collection: Anonymous schedule availability without personal customer data
+    // Busy slots collection: 100% anonymous schedule availability without personal customer data or appointment/customer links
     match /busy_slots/{slotId} {
       allow get, list: if true;
-      allow create: if isValidId(slotId)
-        && request.resource.data.keys().hasOnly(['providerId','startTimeUtc','endTimeUtc','appointmentId'])
+      allow create, update: if isSignedIn()
+        && isValidId(slotId)
+        && request.resource.data.keys().hasOnly(['providerId','startTimeUtc','endTimeUtc'])
         && request.resource.data.providerId is string
         && request.resource.data.startTimeUtc is string
-        && request.resource.data.endTimeUtc is string
-        && request.resource.data.appointmentId is string
-        && (isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/appointments/$(slotId)) && get(/databases/$(database)/documents/appointments/$(slotId)).data.customerUid == request.auth.uid));
-      allow update: if isAdmin();
-      allow delete: if isAdmin()
-        || (isSignedIn() && exists(/databases/$(database)/documents/appointments/$(slotId)) && get(/databases/$(database)/documents/appointments/$(slotId)).data.customerUid == request.auth.uid);
+        && request.resource.data.endTimeUtc is string;
+      allow delete: if isSignedIn();
     }
 
     // Notifications collection: Admin or Recipient read; Create by admin, user to admin, or to self; Update read flag; Delete

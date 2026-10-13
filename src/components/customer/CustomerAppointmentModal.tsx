@@ -37,6 +37,7 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     businessProfile,
     theme,
     currentUser,
+    updateCurrentUser,
     setIsPrivacyModalOpen,
   } = useApp();
 
@@ -58,9 +59,33 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>(currentUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState<string>(currentUser?.phone || '');
+  const [savePhoneToProfile, setSavePhoneToProfile] = useState<boolean>(true);
   const [customerNotes, setCustomerNotes] = useState<string>('');
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [healthConsent, setHealthConsent] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(Boolean(currentUser?.privacyAcceptedAt));
+  const [healthConsent, setHealthConsent] = useState(Boolean(currentUser?.healthConsent));
+
+  const lastUserUidRef = React.useRef(currentUser?.uid);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCustomerName(currentUser?.name || '');
+      setCustomerPhone(currentUser?.phone || '');
+      setPrivacyAccepted(Boolean(currentUser?.privacyAcceptedAt));
+      setHealthConsent(Boolean(currentUser?.healthConsent));
+      setBookingError(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (lastUserUidRef.current !== currentUser?.uid) {
+      lastUserUidRef.current = currentUser?.uid;
+      setCustomerName(currentUser?.name || '');
+      setCustomerPhone(currentUser?.phone || '');
+      setPrivacyAccepted(Boolean(currentUser?.privacyAcceptedAt));
+      setHealthConsent(Boolean(currentUser?.healthConsent));
+      setBookingError(null);
+    }
+  }, [currentUser?.uid, currentUser?.name, currentUser?.phone, currentUser?.privacyAcceptedAt, currentUser?.healthConsent]);
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [successApp, setSuccessApp] = useState<{
@@ -126,6 +151,20 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
         deadlineMinutes: activeService?.providerResponseDeadlineMinutes || 60,
         modality: 'local',
       });
+
+      // Guardar teléfono y nombre en el perfil del cliente para reutilizarlo en futuras citas/pedidos
+      if (savePhoneToProfile && currentUser.isLoggedIn) {
+        const updates: Partial<typeof currentUser> = {};
+        if (customerPhone.trim() && customerPhone.trim() !== currentUser.phone) {
+          updates.phone = customerPhone.trim();
+        }
+        if (customerName.trim() && (!currentUser.name || currentUser.name === 'Cliente')) {
+          updates.name = customerName.trim();
+        }
+        if (Object.keys(updates).length > 0) {
+          updateCurrentUser(updates);
+        }
+      }
     } catch (err: any) {
       console.error('Error creating appointment:', err);
       setBookingError(err?.message || 'Hubo un error al registrar tu cita. Por favor intenta de nuevo.');
@@ -445,6 +484,19 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                     />
                   </div>
                 </div>
+
+                {currentUser.isLoggedIn && (
+                  <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 select-none">
+                    <input
+                      type="checkbox"
+                      checked={savePhoneToProfile}
+                      onChange={(e) => setSavePhoneToProfile(e.target.checked)}
+                      className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <span>Guardar este número en mis datos de contacto para futuras citas y pedidos</span>
+                  </label>
+                )}
+
                 <textarea
                   placeholder="¿Alguna preferencia o alergia que debamos saber?"
                   value={customerNotes}
@@ -454,32 +506,41 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                 />
 
                 <div className="space-y-2 pt-1">
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      id="privacy-app"
-                      required
-                      checked={privacyAccepted}
-                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
-                      className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
-                    />
-                    <label htmlFor="privacy-app" className="text-[11px] text-slate-600 cursor-pointer">
-                      He leído el <button type="button" onClick={() => setIsPrivacyModalOpen(true)} className="text-slate-900 font-bold underline">Aviso de Privacidad</button> y acepto el tratamiento de mis datos para gestionar mis citas y pedidos. *
-                    </label>
-                  </div>
+                  {currentUser.privacyAcceptedAt ? (
+                    <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-2 text-[11px] font-bold text-emerald-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Aviso de Privacidad y Términos aceptados previamente en tu cuenta.</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id="privacy-app"
+                          required
+                          checked={privacyAccepted}
+                          onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                          className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <label htmlFor="privacy-app" className="text-[11px] text-slate-600 cursor-pointer">
+                          He leído el <button type="button" onClick={() => setIsPrivacyModalOpen(true)} className="text-slate-900 font-bold underline">Aviso de Privacidad</button> y acepto el tratamiento de mis datos. *
+                        </label>
+                      </div>
 
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      id="health-app"
-                      checked={healthConsent}
-                      onChange={(e) => setHealthConsent(e.target.checked)}
-                      className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
-                    />
-                    <label htmlFor="health-app" className="text-[11px] text-slate-600 cursor-pointer">
-                      Autorizo el uso de las alergias o datos de salud que escriba en mis notas. (Opcional)
-                    </label>
-                  </div>
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id="health-app"
+                          checked={healthConsent}
+                          onChange={(e) => setHealthConsent(e.target.checked)}
+                          className="mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <label htmlFor="health-app" className="text-[11px] text-slate-600 cursor-pointer">
+                          Autorizo el uso de las alergias o datos de salud que escriba en mis notas. (Opcional)
+                        </label>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

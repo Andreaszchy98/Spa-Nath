@@ -755,10 +755,10 @@ export const AdminInventory: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleOpenRecipeModal(prod)}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                          className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-indigo-200"
                         >
                           <Edit2 className="w-3 h-3" />
-                          <span>{hasRecipe ? 'Editar Receta' : '+ Configurar Receta'}</span>
+                          <span>{hasRecipe ? 'Editar Receta' : 'Configurar'}</span>
                         </button>
                       </div>
                     </div>

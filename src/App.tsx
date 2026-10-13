@@ -10,6 +10,7 @@ import { BottomNavBar } from './components/customer/BottomNavBar';
 import { ProductCustomizerModal } from './components/customer/ProductCustomizerModal';
 import { CartDrawer } from './components/customer/CartDrawer';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { FirstLoginConsentModal } from './components/common/FirstLoginConsentModal';
 import { ShieldCheck } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -51,6 +52,7 @@ const AppContent: React.FC = () => {
       <ProductCustomizerModal />
       <CartDrawer />
       <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />
+      <FirstLoginConsentModal />
     </div>
   );
 };
