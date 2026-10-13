@@ -35,6 +35,7 @@ export const CartDrawer: React.FC = () => {
     createOrder,
     setCustomerTab,
     setIsPrivacyModalOpen,
+    setIsAuthModalOpen,
     theme,
   } = useApp();
 
@@ -75,6 +76,12 @@ export const CartDrawer: React.FC = () => {
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault();
     setCheckoutError(null);
+
+    if (!currentUser.isLoggedIn) {
+      setIsAuthModalOpen(true);
+      setCheckoutError('Debes iniciar sesión para realizar pedidos.');
+      return;
+    }
 
     if (cart.length === 0) return;
     if (!customerName.trim() || !customerPhone.trim()) {

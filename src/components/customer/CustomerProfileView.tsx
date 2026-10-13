@@ -145,7 +145,7 @@ export const CustomerProfileView: React.FC = () => {
                 <span>Navegando como Invitado</span>
               </span>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-tight pt-1">
-                Inicia sesión o regístrate
+                Inicia sesión para crear un perfil
               </h2>
             </div>
 

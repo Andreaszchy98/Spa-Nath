@@ -18,27 +18,31 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-300 ${theme.bgClass}`}
+      className={`min-h-screen flex flex-col justify-between transition-colors duration-300 ${theme.bgClass}`}
       style={businessProfile.customBackgroundColor ? { backgroundColor: businessProfile.customBackgroundColor } : undefined}
     >
-      {/* Top Header with Brand Name and Login Popup */}
-      <Header />
+      <div>
+        {/* Top Header with Brand Name and Login Popup */}
+        <Header />
 
-      {/* Main Content Area */}
-      <main className={`flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-5 ${!isAdmin ? 'pb-24' : ''}`}>
-        {isAdmin ? (
-          <AdminPanel />
-        ) : customerTab === 'catalogo' ? (
-          <CustomerCatalogView />
-        ) : customerTab === 'pedidos' ? (
-          <CustomerOrdersHistory />
-        ) : (
-          <CustomerProfileView />
-        )}
-        
-        {/* Footer with Privacy Notice Link */}
+        {/* Main Content Area */}
+        <main className={`max-w-7xl w-full mx-auto px-4 sm:px-6 pt-5 ${!isAdmin ? 'pb-28' : 'pb-12'}`}>
+          {isAdmin ? (
+            <AdminPanel />
+          ) : customerTab === 'catalogo' ? (
+            <CustomerCatalogView />
+          ) : customerTab === 'pedidos' ? (
+            <CustomerOrdersHistory />
+          ) : (
+            <CustomerProfileView />
+          )}
+        </main>
+      </div>
+
+      {/* Footer with Privacy Notice Link */}
+      <div className={`max-w-7xl w-full mx-auto px-4 sm:px-6 ${!isAdmin ? 'pb-20 sm:pb-4' : 'pb-4'}`}>
         <Footer onOpenPrivacy={() => setIsPrivacyModalOpen(true)} />
-      </main>
+      </div>
 
       {/* Customer Bottom Navigation Bar */}
       {!isAdmin && <BottomNavBar />}
