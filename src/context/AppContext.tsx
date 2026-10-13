@@ -626,7 +626,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthModalOpen(true);
       throw new Error('Debes iniciar sesión para realizar pedidos.');
     }
-    const orderNumber = `PED-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderNumber = `PED-${Date.now().toString().slice(-5)}${Math.floor(100 + Math.random() * 900)}`;
     const newOrder: Order = {
       ...orderData,
       id: `ord-${Date.now()}`,
@@ -1276,7 +1276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const provider = providers.find((p) => p.id === data.providerId) || providers[0] || {
       id: 'prov-1',
-      name: 'Nathalia Silva',
+      name: 'Nathaly Ibarra',
       role: 'Terapeuta & Especialista Principal',
       active: true,
       weeklySchedule: INITIAL_WEEKLY_SCHEDULE,
@@ -1344,7 +1344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const deadlineMs = Math.min(now.getTime() + deadlineMinutes * 60 * 1000, startDate.getTime());
     const providerResponseDeadlineUtc = new Date(deadlineMs).toISOString();
 
-    const appointmentNumber = `CITA-${Math.floor(1000 + Math.random() * 9000)}`;
+    const appointmentNumber = `CITA-${Date.now().toString().slice(-5)}${Math.floor(100 + Math.random() * 900)}`;
 
     const newAppointmentRef = doc(collection(db, 'appointments'));
     const newAppointment: Appointment = {
@@ -1385,7 +1385,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startTimeUtc: newAppointment.startTimeUtc,
         endTimeUtc: newAppointment.endTimeUtc,
         appointmentId: newAppointment.id,
-        customerUid: newAppointment.customerUid || null,
       };
       await upsertBusySlotFirestore(busySlot);
     } catch (saveError) {
@@ -1506,15 +1505,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const daySched = providerSchedule.find(s => s.dayOfWeek === dayOfWeek);
     if (!daySched || !daySched.enabled) return [];
 
-    const dateException = exceptions.find(e => e.date === dateStr && (e.providerId === 'all' || e.providerId === providerId));
-    if (dateException && dateException.type === 'bloqueo_total') return [];
+    const matchingExceptions = exceptions.filter(e => e.date === dateStr && (e.providerId === 'all' || e.providerId === providerId));
+    if (matchingExceptions.some(e => e.type === 'bloqueo_total')) return [];
 
     let startHour = daySched.startTime;
     let endHour = daySched.endTime;
 
-    if (dateException && dateException.type === 'horario_especial' && dateException.startTime && dateException.endTime) {
-      startHour = dateException.startTime;
-      endHour = dateException.endTime;
+    const specialHoursException = matchingExceptions.find(e => e.type === 'horario_especial' && e.startTime && e.endTime);
+    if (specialHoursException && specialHoursException.startTime && specialHoursException.endTime) {
+      startHour = specialHoursException.startTime;
+      endHour = specialHoursException.endTime;
     }
 
     const [startH, startM] = startHour.split(':').map(Number);
@@ -1524,7 +1524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let breakStartMin = -1;
     let breakEndMin = -1;
-    if (daySched.breakStartTime && daySched.breakEndTime && (!dateException || dateException.type !== 'horario_especial')) {
+    if (daySched.breakStartTime && daySched.breakEndTime && !specialHoursException) {
       const [bh1, bm1] = daySched.breakStartTime.split(':').map(Number);
       const [bh2, bm2] = daySched.breakEndTime.split(':').map(Number);
       breakStartMin = bh1 * 60 + bm1;
@@ -1535,6 +1535,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (slot.providerId !== providerId) return false;
       const slotStart = new Date(slot.startTimeUtc);
       return slotStart.getFullYear() === year && slotStart.getMonth() === month - 1 && slotStart.getDate() === day;
+    });
+
+    const activeAppointments = appointments.filter(a => {
+      if (a.status === 'cancelada') return false;
+      if (a.providerId !== providerId) return false;
+      const aStart = new Date(a.startTimeUtc);
+      return aStart.getFullYear() === year && aStart.getMonth() === month - 1 && aStart.getDate() === day;
     });
 
     const now = new Date();
@@ -1550,13 +1557,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const overlapsBreak = breakStartMin !== -1 && !(slotEndMinutes <= breakStartMin || currentMinutes >= breakEndMin);
 
-      const overlapsApp = providerBusySlots.some(slot => {
+      const overlapsBusySlot = providerBusySlots.some(slot => {
         const slotStart = new Date(slot.startTimeUtc);
         const slotEnd = new Date(slot.endTimeUtc);
         const slotStartMin = slotStart.getHours() * 60 + slotStart.getMinutes();
         const slotEndMin = slotEnd.getHours() * 60 + slotEnd.getMinutes();
         return !(slotEndMinutes <= slotStartMin || currentMinutes >= slotEndMin);
       });
+
+      const overlapsAppointment = activeAppointments.some(a => {
+        const aStart = new Date(a.startTimeUtc);
+        const aEnd = new Date(a.endTimeUtc);
+        const aStartMin = aStart.getHours() * 60 + aStart.getMinutes();
+        const aEndMin = aEnd.getHours() * 60 + aEnd.getMinutes();
+        return !(slotEndMinutes <= aStartMin || currentMinutes >= aEndMin);
+      });
+
+      const overlapsApp = overlapsBusySlot || overlapsAppointment;
 
       const slotDateTime = new Date(year, month - 1, day, slotStartH, slotStartM);
       const isPastMinNotice = slotDateTime >= minNoticeTime;
@@ -1880,7 +1897,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   startTimeUtc: app.startTimeUtc,
                   endTimeUtc: app.endTimeUtc,
                   appointmentId: app.id,
-                  customerUid: app.customerUid || null,
                 }).catch(() => {});
               }
             }
@@ -2156,6 +2172,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (e) {}
       }
       try {
+        await deleteBusySlotFirestore(app.id);
+      } catch (e) {}
+      try {
         const appRef = doc(db, 'appointments', app.id);
         await setDoc(appRef, {
           customerName: 'Cuenta eliminada',
@@ -2166,6 +2185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }, { merge: true });
       } catch (e) {}
     }
+    setBusySlots((prev) => prev.filter((b) => !userApps.some((a) => a.id === b.appointmentId)));
 
     const userOrders = orders.filter((o) => o.customerUid === uid || (currentUser.phone && o.customerPhone === currentUser.phone));
     for (const ord of userOrders) {

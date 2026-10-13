@@ -219,9 +219,9 @@ export const AdminInventory: React.FC = () => {
       updateIngredient(editingIngredient.id, {
         name: ingName.trim(),
         unit: ingUnit,
-        stock: Number(ingStock),
-        minStockAlert: Number(ingMinAlert),
-        costPerUnit: Number(ingCost),
+        stock: Math.max(0, Number(ingStock) || 0),
+        minStockAlert: Math.max(0, Number(ingMinAlert) || 0),
+        costPerUnit: Math.max(0, Number(ingCost) || 0),
         category: ingCategory.trim(),
         supplier: ingSupplier.trim() || undefined,
       });
@@ -229,9 +229,9 @@ export const AdminInventory: React.FC = () => {
       addIngredient({
         name: ingName.trim(),
         unit: ingUnit,
-        stock: Number(ingStock),
-        minStockAlert: Number(ingMinAlert),
-        costPerUnit: Number(ingCost),
+        stock: Math.max(0, Number(ingStock) || 0),
+        minStockAlert: Math.max(0, Number(ingMinAlert) || 0),
+        costPerUnit: Math.max(0, Number(ingCost) || 0),
         category: ingCategory.trim(),
         supplier: ingSupplier.trim() || undefined,
       });

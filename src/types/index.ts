@@ -292,7 +292,6 @@ export interface BusySlot {
   startTimeUtc: string;
   endTimeUtc: string;
   appointmentId: string;
-  customerUid: string | null;
 }
 
 export interface UserProfile {

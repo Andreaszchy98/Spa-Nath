@@ -112,7 +112,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // 4. Test connection on boot
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDocFromServer(doc(db, 'business_profiles', 'default'));
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
@@ -679,7 +679,6 @@ export async function upsertBusySlotFirestore(slot: BusySlot): Promise<void> {
       startTimeUtc: slot.startTimeUtc,
       endTimeUtc: slot.endTimeUtc,
       appointmentId: slot.appointmentId,
-      customerUid: slot.customerUid !== undefined ? slot.customerUid : null,
     });
     await setDoc(doc(db, 'busy_slots', slot.id), cleaned);
   } catch (error) {

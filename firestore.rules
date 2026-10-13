@@ -49,28 +49,28 @@ service cloud.firestore {
     // Validation functions
     function isValidProduct(data) {
       return data.id is string && data.id.size() <= 128 &&
-             data.name is string && data.name.size() >= 0 && data.name.size() <= 200 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              data.category is string && data.category.size() <= 100 &&
              data.price is number && data.price >= 0 &&
-             data.stock is number &&
+             data.stock is number && data.stock >= 0 &&
              data.available is bool;
     }
 
     function isValidIngredient(data) {
       return data.id is string && data.id.size() <= 128 &&
-             data.name is string && data.name.size() >= 0 && data.name.size() <= 200 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
              data.unit is string && data.unit.size() <= 50 &&
-             data.stock is number &&
-             data.minStockAlert is number &&
-             data.costPerUnit is number &&
+             data.stock is number && data.stock >= 0 &&
+             data.minStockAlert is number && data.minStockAlert >= 0 &&
+             data.costPerUnit is number && data.costPerUnit >= 0 &&
              data.category is string && data.category.size() <= 100;
     }
 
     function isValidOrder(data) {
       return data.id is string && data.id.size() <= 128 &&
              data.orderNumber is string && data.orderNumber.size() <= 50 &&
-             data.customerName is string && data.customerName.size() >= 0 && data.customerName.size() <= 200 &&
-             data.customerPhone is string && data.customerPhone.size() >= 0 && data.customerPhone.size() <= 50 &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 200 &&
+             data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 50 &&
              data.items is list && data.items.size() <= 100 &&
              data.total is number && data.total >= 0 &&
              data.createdAt is string && data.createdAt.size() <= 50;
@@ -85,25 +85,29 @@ service cloud.firestore {
              data.active is bool;
     }
 
-    // Connection test document
-    match /test/{testId} {
-      allow read, write: if true;
+    function isValidAppointment(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.appointmentNumber is string && data.appointmentNumber.size() <= 50 &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 200 &&
+             data.customerPhone is string && data.customerPhone.size() > 0 && data.customerPhone.size() <= 50 &&
+             data.serviceId is string && data.serviceId.size() <= 128 &&
+             data.providerId is string && data.providerId.size() <= 128 &&
+             data.startTimeUtc is string && data.startTimeUtc.size() <= 50 &&
+             data.endTimeUtc is string && data.endTimeUtc.size() <= 50;
     }
 
-    // Products collection
+    // Products collection: Only manager (admin) can modify catalog
     match /products/{productId} {
       allow get, list: if true;
-      allow create: if isValidId(productId) && isValidProduct(incoming());
-      allow update: if isValidId(productId);
-      allow delete: if isValidId(productId);
+      allow create, update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow delete: if isAdmin() && isValidId(productId);
     }
 
-    // Ingredients collection
+    // Ingredients collection: Only manager (admin) can modify inventory
     match /ingredients/{ingredientId} {
       allow get, list: if true;
-      allow create: if isValidId(ingredientId) && isValidIngredient(incoming());
-      allow update: if isValidId(ingredientId);
-      allow delete: if isValidId(ingredientId);
+      allow create, update: if isAdmin() && isValidId(ingredientId) && isValidIngredient(incoming());
+      allow delete: if isAdmin() && isValidId(ingredientId);
     }
 
     // Orders collection: Admin or Owner read; Create with valid fields; Update by admin, owner cancel, or anonymizing; Delete only admin
@@ -116,53 +120,54 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Banners collection
+    // Banners collection: Only manager can modify
     match /banners/{bannerId} {
       allow get, list: if true;
-      allow create: if isValidId(bannerId) && isValidBanner(incoming());
-      allow update: if isValidId(bannerId);
-      allow delete: if isValidId(bannerId);
+      allow create, update: if isAdmin() && isValidId(bannerId) && isValidBanner(incoming());
+      allow delete: if isAdmin() && isValidId(bannerId);
     }
 
-    // Business profiles
+    // Business profiles: Only manager can modify
     match /business_profiles/{profileId} {
       allow get, list: if true;
-      allow create: if isValidId(profileId);
-      allow update: if isValidId(profileId);
-      allow delete: if isValidId(profileId);
+      allow create, update, delete: if isAdmin() && isValidId(profileId);
     }
 
-    // Providers collection
+    // Providers collection: Only manager can modify
     match /providers/{providerId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(providerId);
     }
 
-    // Weekly schedule collection
+    // Weekly schedule collection: Only manager can modify
     match /weekly_schedule/{dayId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(dayId);
     }
 
-    // Schedule exceptions collection
+    // Schedule exceptions collection: Only manager can modify
     match /exceptions/{excId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(excId);
     }
 
     // Appointments collection: Admin or Owner read; Create with valid fields; Update by admin, owner cancel, or anonymizing; Delete only admin
     match /appointments/{appId} {
       allow get, list: if isAdmin() || isOwner();
-      allow create: if isValidId(appId) && validOwnerField();
+      allow create: if isValidId(appId) && validOwnerField() && isValidAppointment(incoming());
       allow update: if isAdmin() ||
                       (isOwner() && incoming().status == 'cancelada') ||
                       isAnonymizing();
       allow delete: if isAdmin();
     }
 
-    // Services collection
+    // Services collection: Only manager can modify
     match /services/{serviceId} {
-      allow get, list, create, update, delete: if true;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(serviceId);
     }
 
-    // Users collection
+    // Users collection: Strict privacy protection for user accounts
     match /users/{userId} {
       allow get: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow list: if isAdmin();
@@ -173,19 +178,19 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
     }
 
-    // Busy slots collection
+    // Busy slots collection: Anonymous schedule availability without personal customer data
     match /busy_slots/{slotId} {
       allow get, list: if true;
       allow create: if isValidId(slotId)
-        && request.resource.data.keys().hasOnly(['providerId','startTimeUtc','endTimeUtc','appointmentId','customerUid'])
+        && request.resource.data.keys().hasOnly(['providerId','startTimeUtc','endTimeUtc','appointmentId'])
         && request.resource.data.providerId is string
         && request.resource.data.startTimeUtc is string
         && request.resource.data.endTimeUtc is string
-        && (!('customerUid' in request.resource.data) || request.resource.data.customerUid == null
-            || request.resource.data.customerUid == request.auth.uid);
+        && request.resource.data.appointmentId is string
+        && (isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/appointments/$(slotId)) && get(/databases/$(database)/documents/appointments/$(slotId)).data.customerUid == request.auth.uid));
       allow update: if isAdmin();
       allow delete: if isAdmin()
-        || (isSignedIn() && 'customerUid' in resource.data && resource.data.customerUid == request.auth.uid);
+        || (isSignedIn() && exists(/databases/$(database)/documents/appointments/$(slotId)) && get(/databases/$(database)/documents/appointments/$(slotId)).data.customerUid == request.auth.uid);
     }
 
     // Notifications collection: Admin or Recipient read; Create by admin, user to admin, or to self; Update read flag; Delete

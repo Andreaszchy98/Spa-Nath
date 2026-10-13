@@ -15,7 +15,6 @@ import {
   Settings,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getTheme } from '../../utils/themes';
 
 export const CustomerProfileView: React.FC = () => {
   const {
@@ -33,7 +32,7 @@ export const CustomerProfileView: React.FC = () => {
     theme,
   } = useApp();
 
-  const currentTheme = getTheme(theme);
+  const currentTheme = theme;
 
   const [name, setName] = useState(currentUser.name || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
