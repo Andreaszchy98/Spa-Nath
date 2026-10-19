@@ -338,9 +338,9 @@ export const AdminCatalog: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {products.map((product) => (
+          {products.map((product, pIdx) => (
           <div
-            key={product.id}
+            key={`${product.id}-${pIdx}`}
             className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between"
           >
             <div>

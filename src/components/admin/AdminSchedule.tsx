@@ -463,8 +463,8 @@ export const AdminSchedule: React.FC = () => {
           <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
             <h3 className="text-base font-bold text-slate-800">Personal Registrado ({providers.length})</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {providers.map((prov) => (
-                <div key={prov.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+              {providers.map((prov, pIdx) => (
+                <div key={`${prov.id}-${pIdx}`} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={prov.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}

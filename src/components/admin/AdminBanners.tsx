@@ -10,10 +10,12 @@ import {
   CheckCircle2,
   ExternalLink,
   Power,
+  Calendar,
+  ShoppingBag,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GoogleDriveInput } from '../common/GoogleDriveInput';
-import { BannerBadge, PromoBanner } from '../../types';
+import { BannerBadge, BannerTargetType, PromoBanner } from '../../types';
 
 export const AdminBanners: React.FC = () => {
   const {
@@ -23,6 +25,7 @@ export const AdminBanners: React.FC = () => {
     deleteBanner,
     toggleBannerActive,
     products,
+    services,
     theme,
   } = useApp();
 
@@ -36,19 +39,24 @@ export const AdminBanners: React.FC = () => {
   const [tagline, setTagline] = useState('');
   const [badge, setBadge] = useState<BannerBadge>('PROMOCIÓN');
   const [imageUrl, setImageUrl] = useState('/src/assets/images/hero_artisan_banner_1791387671351.jpg');
+  const [targetType, setTargetType] = useState<BannerTargetType>('product');
   const [targetProductId, setTargetProductId] = useState<string>(products[0]?.id || '');
+  const [targetServiceId, setTargetServiceId] = useState<string>(services[0]?.id || '');
   const [discountHighlight, setDiscountHighlight] = useState('');
   const [active, setActive] = useState(true);
 
   const handleOpenNew = () => {
     setEditingBannerId(null);
     setTitle('Especial de la Semana');
-    setSubtitle('Descubre nuestra creación destacada y disfruta envío gratis hoy');
+    setSubtitle('Descubre nuestra creación destacada y disfruta de una experiencia única');
     setTagline('Promoción por Tiempo Limitado');
     setBadge('PROMOCIÓN');
     setImageUrl('/src/assets/images/hero_artisan_banner_1791387671351.jpg');
+    const defaultType: BannerTargetType = products.length > 0 ? 'product' : (services.length > 0 ? 'service' : 'none');
+    setTargetType(defaultType);
     setTargetProductId(products[0]?.id || '');
-    setDiscountHighlight('2x1 Especial');
+    setTargetServiceId(services[0]?.id || '');
+    setDiscountHighlight('Especial Spa');
     setActive(true);
     setIsEditorOpen(true);
   };
@@ -60,7 +68,10 @@ export const AdminBanners: React.FC = () => {
     setTagline(b.tagline || '');
     setBadge(b.badge);
     setImageUrl(b.imageUrl);
-    setTargetProductId(b.targetProductId || '');
+    const detectedType: BannerTargetType = b.targetType || (b.targetServiceId ? 'service' : b.targetProductId ? 'product' : 'none');
+    setTargetType(detectedType);
+    setTargetProductId(b.targetProductId || (products[0]?.id || ''));
+    setTargetServiceId(b.targetServiceId || (services[0]?.id || ''));
     setDiscountHighlight(b.discountHighlight || '');
     setActive(b.active);
     setIsEditorOpen(true);
@@ -76,7 +87,9 @@ export const AdminBanners: React.FC = () => {
       tagline: tagline.trim() || undefined,
       badge,
       imageUrl: imageUrl.trim() || '/src/assets/images/hero_artisan_banner_1791387671351.jpg',
-      targetProductId: targetProductId || undefined,
+      targetType,
+      targetProductId: targetType === 'product' ? (targetProductId || undefined) : undefined,
+      targetServiceId: targetType === 'service' ? (targetServiceId || undefined) : undefined,
       discountHighlight: discountHighlight.trim() || undefined,
       active,
     };
@@ -112,12 +125,15 @@ export const AdminBanners: React.FC = () => {
 
       {/* Banners List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {banners.map((banner) => {
-          const linkedProduct = products.find((p) => p.id === banner.targetProductId);
+        {banners.map((banner, bIdx) => {
+          const isService = banner.targetType === 'service' || (!banner.targetType && Boolean(banner.targetServiceId));
+          const isProduct = banner.targetType === 'product' || (!banner.targetType && Boolean(banner.targetProductId && !banner.targetServiceId));
+          const linkedProduct = isProduct && banner.targetProductId ? products.find((p) => p.id === banner.targetProductId) : null;
+          const linkedService = isService && banner.targetServiceId ? services.find((s) => s.id === banner.targetServiceId) : null;
 
           return (
             <div
-              key={banner.id}
+              key={`${banner.id}-${bIdx}`}
               className={`bg-white rounded-2xl border overflow-hidden shadow-2xs flex flex-col justify-between transition-all ${
                 banner.active ? 'border-slate-200' : 'border-slate-200 opacity-60'
               }`}
@@ -172,17 +188,30 @@ export const AdminBanners: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Linked Product Info */}
+                {/* Linked Target Info */}
                 <div className="p-4 space-y-2 text-xs">
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                    <span className="text-slate-500 font-medium">Producto Destino vinculado:</span>
-                    {linkedProduct ? (
-                      <span className="font-bold text-slate-900 flex items-center gap-1">
+                    <span className="text-slate-500 font-medium">Destino al hacer clic:</span>
+                    {linkedService ? (
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                        <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>Servicio Cita</span>
+                        </span>
+                        <span>{linkedService.name}</span>
+                        <span className="text-slate-500">(${linkedService.price})</span>
+                      </span>
+                    ) : linkedProduct ? (
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center gap-1">
+                          <ShoppingBag className="w-3 h-3" />
+                          <span>Producto</span>
+                        </span>
                         <span>{linkedProduct.name}</span>
                         <span className="text-slate-500">(${linkedProduct.price})</span>
                       </span>
                     ) : (
-                      <span className="text-amber-700 font-medium italic">Sin producto asociado</span>
+                      <span className="text-slate-400 font-medium italic">Sin acción vinculada (Solo visual)</span>
                     )}
                   </div>
                 </div>
@@ -312,26 +341,113 @@ export const AdminBanners: React.FC = () => {
                 </div>
               </div>
 
-              {/* Linked Product Dropdown */}
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                <label className="font-bold text-slate-800 block text-xs">
-                  Producto Destino del Catálogo (Al hacer clic en el banner) *
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  Cuando el cliente pulse en el banner, se abrirá directamente el modal de personalización de este producto.
-                </p>
-                <select
-                  value={targetProductId}
-                  onChange={(e) => setTargetProductId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-                >
-                  <option value="">-- Sin producto vinculado --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.category} · ${p.price})
-                    </option>
-                  ))}
-                </select>
+              {/* Linked Target Selector: Producto, Servicio o Ninguno */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div>
+                  <label className="font-bold text-slate-800 block text-xs">
+                    Acción de Destino (Al pulsar el banner) *
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Elige si este banner dirigirá a un producto, a un servicio para agendar cita, o si solo es informativo.
+                  </p>
+                </div>
+
+                {/* Segmented Radio / Buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('product')}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
+                      targetType === 'product'
+                        ? 'bg-blue-50 border-blue-500 text-blue-900 shadow-xs ring-1 ring-blue-500'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ShoppingBag className="w-4 h-4 text-blue-600" />
+                    <span>Producto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('service')}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
+                      targetType === 'service'
+                        ? 'bg-rose-50 border-rose-500 text-rose-900 shadow-xs ring-1 ring-rose-500'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4 text-rose-600" />
+                    <span>Servicio (Cita)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTargetType('none')}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-all ${
+                      targetType === 'none'
+                        ? 'bg-slate-200 border-slate-500 text-slate-900 shadow-xs ring-1 ring-slate-500'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ExternalLink className="w-4 h-4 text-slate-500" />
+                    <span>Solo Anuncio</span>
+                  </button>
+                </div>
+
+                {/* Product dropdown */}
+                {targetType === 'product' && (
+                  <div className="pt-1 space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-700 block">
+                      Selecciona el Producto del Catálogo:
+                    </label>
+                    <select
+                      value={targetProductId}
+                      onChange={(e) => setTargetProductId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">-- Sin producto vinculado --</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.category} · ${p.price})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-500">
+                      Al hacer clic en el banner, se abrirá la vista detallada de este producto para agregarlo al carrito.
+                    </p>
+                  </div>
+                )}
+
+                {/* Service dropdown */}
+                {targetType === 'service' && (
+                  <div className="pt-1 space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-700 block">
+                      Selecciona el Servicio de Spa / Cabina:
+                    </label>
+                    <select
+                      value={targetServiceId}
+                      onChange={(e) => setTargetServiceId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                    >
+                      <option value="">-- Sin servicio vinculado --</option>
+                      {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.category} · ${s.price} · {s.durationMinutes} min)
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-500">
+                      Al hacer clic en el banner, se abrirá directamente el asistente de reserva de cita para este servicio.
+                    </p>
+                  </div>
+                )}
+
+                {/* None selected explanation */}
+                {targetType === 'none' && (
+                  <p className="text-[11px] text-slate-500 italic bg-white p-2.5 rounded-lg border border-slate-200">
+                    Este banner se mostrará como un anuncio gráfico o informativo, sin abrir ninguna ventana de compra o agenda.
+                  </p>
+                )}
               </div>
 
               {/* Google Drive Image Normalizer */}

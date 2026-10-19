@@ -120,6 +120,7 @@ export interface Product {
 }
 
 export type BannerBadge = 'PROMOCIÓN' | 'PATROCINIO' | 'NOVEDAD' | 'ANUNCIO';
+export type BannerTargetType = 'product' | 'service' | 'none';
 
 export interface PromoBanner {
   id: string;
@@ -128,7 +129,9 @@ export interface PromoBanner {
   tagline?: string;
   badge: BannerBadge;
   imageUrl: string;
+  targetType?: BannerTargetType; // 'product' | 'service' | 'none'
   targetProductId?: string; // ID del producto del catálogo al que dirige
+  targetServiceId?: string; // ID del servicio de cabina/spa al que dirige
   active: boolean;
   discountHighlight?: string; // e.g. "-20% HOY"
 }

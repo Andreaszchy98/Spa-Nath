@@ -446,9 +446,9 @@ export const CartDrawer: React.FC = () => {
           ) : (
             /* Items List */
             <div className="space-y-3">
-              {cart.map((item) => (
+              {cart.map((item, cIdx) => (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${cIdx}`}
                   className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 text-xs"
                 >
                   <div className="flex items-start justify-between gap-2">

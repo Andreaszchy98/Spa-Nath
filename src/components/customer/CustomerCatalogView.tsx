@@ -14,13 +14,9 @@ import {
 import { useApp } from '../../context/AppContext';
 import { Product, Service } from '../../types';
 import { PromoBannerCarousel } from './PromoBannerCarousel';
-import { CustomerAppointmentModal } from './CustomerAppointmentModal';
 
 export const CustomerCatalogView: React.FC = () => {
-  const { products, services, openProductModal, businessProfile, theme } = useApp();
-
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [bookingServiceId, setBookingServiceId] = useState<string | undefined>();
+  const { products, services, openProductModal, openAppointmentModal, businessProfile, theme } = useApp();
 
   // Accordion collapsed state per category (default true = collapsed/hidden)
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -73,13 +69,13 @@ export const CustomerCatalogView: React.FC = () => {
   }, {} as Record<string, Product[]>);
 
   // Render physical product card
-  const renderProductCard = (product: Product) => {
+  const renderProductCard = (product: Product, index: number = 0) => {
     const isOutOfStock = businessProfile.enableStockControl && product.stock <= 0;
     const hasOptions = product.optionGroups && product.optionGroups.length > 0;
 
     return (
       <div
-        key={product.id}
+        key={`${product.id}-${index}`}
         className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col group"
       >
         <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
@@ -151,10 +147,10 @@ export const CustomerCatalogView: React.FC = () => {
   };
 
   // Render Service card (No stock, No SKU, with duration, modality, confirmation)
-  const renderServiceCard = (service: Service) => {
+  const renderServiceCard = (service: Service, index: number = 0) => {
     return (
       <div
-        key={service.id}
+        key={`${service.id}-${index}`}
         className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col group justify-between"
       >
         <div>
@@ -232,10 +228,7 @@ export const CustomerCatalogView: React.FC = () => {
             </div>
 
             <button
-              onClick={() => {
-                setBookingServiceId(service.id);
-                setIsBookingModalOpen(true);
-              }}
+              onClick={() => openAppointmentModal(service.id)}
               className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 text-white active:scale-95 bg-rose-600 hover:bg-rose-700"
             >
               <Calendar className="w-3.5 h-3.5" />
@@ -364,7 +357,7 @@ export const CustomerCatalogView: React.FC = () => {
                   {/* Category Items Grid */}
                   {!isCollapsed && (
                     <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {catServices.map((serv) => renderServiceCard(serv))}
+                      {catServices.map((serv, sIdx) => renderServiceCard(serv, sIdx))}
                     </div>
                   )}
                 </div>
@@ -424,7 +417,7 @@ export const CustomerCatalogView: React.FC = () => {
                   {/* Category Items Grid */}
                   {!isCollapsed && (
                     <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {catProducts.map((prod) => renderProductCard(prod))}
+                      {catProducts.map((prod, pIdx) => renderProductCard(prod, pIdx))}
                     </div>
                   )}
                 </div>
@@ -433,13 +426,6 @@ export const CustomerCatalogView: React.FC = () => {
           </div>
         )
       )}
-
-      {/* Booking Modal */}
-      <CustomerAppointmentModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-        preselectedServiceId={bookingServiceId}
-      />
     </div>
   );
 };

@@ -150,8 +150,11 @@ export const AdminSalesOrders: React.FC = () => {
     appointmentData?: Appointment;
   }
 
+  const uniqueOrders = Array.from(new Map(orders.map((o) => [o.id, o])).values());
+  const uniqueAppointments = Array.from(new Map(appointments.map((a) => [a.id, a])).values());
+
   const unifiedList: UnifiedComanda[] = [
-    ...orders.map((o) => ({
+    ...uniqueOrders.map((o) => ({
       id: o.id,
       type: 'pedido' as const,
       number: o.orderNumber,
@@ -164,7 +167,7 @@ export const AdminSalesOrders: React.FC = () => {
       paid: o.paymentReceived,
       orderData: o,
     })),
-    ...appointments.map((a) => ({
+    ...uniqueAppointments.map((a) => ({
       id: a.id,
       type: 'cita' as const,
       number: a.appointmentNumber,
@@ -367,7 +370,7 @@ export const AdminSalesOrders: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredList.map((item) => {
+          {filteredList.map((item, idx) => {
             const isOrder = item.type === 'pedido';
             const order = item.orderData;
             const appointment = item.appointmentData;
@@ -377,7 +380,7 @@ export const AdminSalesOrders: React.FC = () => {
 
             return (
               <div
-                key={`${item.type}-${item.id}`}
+                key={`${item.type}-${item.id}-${idx}`}
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4"
               >
                 {/* Comanda Header */}

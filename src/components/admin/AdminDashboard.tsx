@@ -59,8 +59,11 @@ export const AdminDashboard: React.FC = () => {
   );
   const totalCriticalStock = lowStockProducts.length + lowStockIngredients.length;
 
-  // Recent unified operations (comandas)
-  const recentOrders = orders.slice(0, 5).map((o) => ({
+  // Recent unified operations (comandas) with robust deduplication
+  const uniqueOrders = Array.from(new Map(orders.map((o) => [o.id, o])).values());
+  const uniqueAppointments = Array.from(new Map(appointments.map((a) => [a.id, a])).values());
+
+  const recentOrders = uniqueOrders.slice(0, 5).map((o) => ({
     type: 'order' as const,
     id: o.id,
     number: o.orderNumber,
@@ -73,7 +76,7 @@ export const AdminDashboard: React.FC = () => {
     date: o.createdAt,
   }));
 
-  const recentAppointments = appointments.slice(0, 5).map((a) => ({
+  const recentAppointments = uniqueAppointments.slice(0, 5).map((a) => ({
     type: 'appointment' as const,
     id: a.id,
     number: a.appointmentNumber,
@@ -86,9 +89,13 @@ export const AdminDashboard: React.FC = () => {
     date: a.createdAt || a.startTimeUtc,
   }));
 
-  const combinedRecent = [...recentOrders, ...recentAppointments]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 6);
+  const combinedRecent = Array.from(
+    new Map(
+      [...recentOrders, ...recentAppointments]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .map((op) => [`${op.type}-${op.id}`, op])
+    ).values()
+  ).slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -366,8 +373,8 @@ export const AdminDashboard: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                combinedRecent.map((op) => (
-                  <tr key={`${op.type}-${op.id}`} className="hover:bg-slate-50/70 transition-colors">
+                combinedRecent.map((op, idx) => (
+                  <tr key={`${op.type}-${op.id}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-3 font-mono font-bold text-slate-900">
                       {op.number}
                     </td>

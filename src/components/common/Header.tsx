@@ -153,44 +153,8 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Right side in Top Bar: Shopping Bag & User Profile Button */}
+          {/* Right side in Top Bar: User Profile / Login Button only */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Cart Button (Only for clients) */}
-            {!isAdmin && (
-              <button
-                type="button"
-                onClick={() => setIsCartDrawerOpen(true)}
-                className="relative p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-1.5 active:scale-95 border border-white/15"
-                title="Abrir Carrito"
-                aria-label="Abrir Carrito"
-              >
-                <ShoppingBag className="w-4 h-4 text-white" />
-                <span className="hidden xs:inline text-xs font-semibold">Carrito</span>
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Notification Bell Button */}
-            <button
-              type="button"
-              onClick={() => setIsNotificationDrawerOpen(true)}
-              className="relative p-2 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-1.5 active:scale-95 border border-white/15"
-              title="Centro de Notificaciones"
-              aria-label="Centro de Notificaciones"
-            >
-              <Bell className="w-4 h-4 text-white" />
-              <span className="hidden xs:inline text-xs font-semibold">Avisos</span>
-              {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-
             {/* Login / Role Profile Button (opens popup modal) */}
             <button
               type="button"
@@ -230,82 +194,165 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Lower navigation bar: Only for Admin pages selector */}
-        {isAdmin && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-13 sm:h-14 flex items-center justify-between gap-3 border-t border-slate-100">
-            {/* Admin Single Clean Page Selector */}
-            <div className="relative" ref={pageMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsPageMenuOpen(!isPageMenuOpen)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-900 font-bold text-xs sm:text-sm transition-all shadow-2xs active:scale-98"
-              >
-                <span className="text-slate-800 flex items-center">
-                  {currentPage.icon}
-                </span>
-                <span>{currentPage.name}</span>
-                {currentPage.badge && currentPage.badge > 0 ? (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-600 text-white">
-                    {currentPage.badge}
-                  </span>
-                ) : null}
-                <ChevronDown
-                  className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
-                    isPageMenuOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Dropdown Menu of Admin Sections */}
-              {isPageMenuOpen && (
-                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <div className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                    Seleccionar Página / Módulo
-                  </div>
-                  {adminPages.map((page) => (
-                    <button
-                      key={page.id}
-                      type="button"
-                      onClick={() => {
-                        setAdminTab(page.id);
-                        setIsPageMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors rounded-xl ${
-                        adminTab === page.id
-                          ? 'text-white font-bold shadow-xs'
-                          : 'text-slate-700 hover:bg-slate-100'
+        {/* Secondary Sub-Bar located directly beneath the Top Bar */}
+        <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-12 sm:h-13 flex items-center justify-between gap-3">
+            {isAdmin ? (
+              <>
+                {/* Admin Page Selector */}
+                <div className="relative" ref={pageMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPageMenuOpen(!isPageMenuOpen)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-900 font-bold text-xs sm:text-sm transition-all shadow-2xs active:scale-98"
+                  >
+                    <span className="text-slate-800 flex items-center">
+                      {currentPage.icon}
+                    </span>
+                    <span>{currentPage.name}</span>
+                    {currentPage.badge && currentPage.badge > 0 ? (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-600 text-white">
+                        {currentPage.badge}
+                      </span>
+                    ) : null}
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
+                        isPageMenuOpen ? 'rotate-180' : ''
                       }`}
-                      style={
-                        adminTab === page.id
-                          ? { backgroundColor: theme.raw.primaryBtn, color: theme.raw.primaryBtnText }
-                          : undefined
-                      }
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className={adminTab === page.id ? 'text-white' : 'text-slate-500'}>
-                          {page.icon}
-                        </span>
-                        <span>{page.name}</span>
-                      </div>
-                      {page.badge && page.badge > 0 ? (
-                        <span
-                          className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            adminTab === page.id
-                              ? 'bg-rose-500 text-white'
-                              : 'bg-rose-100 text-rose-700'
-                          }`}
-                        >
-                          {page.badge}
-                        </span>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                    />
+                  </button>
 
+                  {/* Dropdown Menu of Admin Sections */}
+                  {isPageMenuOpen && (
+                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                        Seleccionar Página / Módulo
+                      </div>
+                      {adminPages.map((page) => (
+                        <button
+                          key={page.id}
+                          type="button"
+                          onClick={() => {
+                            setAdminTab(page.id);
+                            setIsPageMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition-colors rounded-xl ${
+                            adminTab === page.id
+                              ? 'text-white font-bold shadow-xs'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                          style={
+                            adminTab === page.id
+                              ? { backgroundColor: theme.raw.primaryBtn, color: theme.raw.primaryBtnText }
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className={adminTab === page.id ? 'text-white' : 'text-slate-500'}>
+                              {page.icon}
+                            </span>
+                            <span>{page.name}</span>
+                          </div>
+                          {page.badge && page.badge > 0 ? (
+                            <span
+                              className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                adminTab === page.id
+                                  ? 'bg-rose-500 text-white'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}
+                            >
+                              {page.badge}
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notification Bell in Admin Sub-Bar */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationDrawerOpen(true)}
+                    className="relative px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 transition-all flex items-center gap-1.5 active:scale-95 border border-slate-200 text-xs font-semibold shadow-2xs"
+                    title="Centro de Notificaciones"
+                    aria-label="Centro de Notificaciones"
+                  >
+                    <Bell className="w-4 h-4 text-slate-600" />
+                    <span className="hidden sm:inline">Avisos</span>
+                    {unreadNotificationsCount > 0 && (
+                      <span className="bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                        {unreadNotificationsCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Left side for Client: Tagline / Brand slogan */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-rose-50 text-rose-600 shrink-0 border border-rose-100">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">
+                      {businessProfile.slogan || 'Cuidado Facial, Masajes & Belleza'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate hidden xs:block">
+                      Agenda tu cita personalizada o adquiere productos oficiales
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right side for Client: Notifications and Shopping Cart Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Notification Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationDrawerOpen(true)}
+                    className="relative p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 transition-all flex items-center gap-1.5 active:scale-95 border border-slate-200 text-xs font-semibold shadow-2xs"
+                    title="Centro de Notificaciones"
+                    aria-label="Centro de Notificaciones"
+                  >
+                    <Bell className="w-4 h-4 text-slate-600" />
+                    <span className="hidden sm:inline">Avisos</span>
+                    {unreadNotificationsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 sm:static bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                        {unreadNotificationsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Shopping Cart Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsCartDrawerOpen(true)}
+                    className={`relative px-3 sm:px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 border shadow-2xs text-xs font-bold ${
+                      cartCount > 0
+                        ? 'border-transparent text-white'
+                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border-slate-200'
+                    }`}
+                    style={cartCount > 0 ? { backgroundColor: theme.raw.primaryBtn, color: theme.raw.primaryBtnText } : undefined}
+                    title="Abrir Carrito de Compras"
+                    aria-label="Abrir Carrito de Compras"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span className="hidden xs:inline">Carrito</span>
+                    {cartCount > 0 ? (
+                      <span className="bg-white/25 text-white text-[10px] font-black px-1.5 min-w-4 h-4 rounded-full flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium opacity-60">0</span>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </header>
 
       {/* Auth Modal Popup */}

@@ -228,8 +228,8 @@ export const AdminServices: React.FC = () => {
                 {/* Category Items Grid */}
                 {!isCollapsed && (
                   <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {catServices.map((serv) => (
-                      <div key={serv.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between">
+                    {catServices.map((serv, sIdx) => (
+                      <div key={`${serv.id}-${sIdx}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between">
                         <div>
                           <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
                             <img

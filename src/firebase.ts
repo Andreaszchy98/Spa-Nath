@@ -390,7 +390,9 @@ export async function upsertBannerFirestore(banner: PromoBanner): Promise<void> 
       tagline: banner.tagline || '',
       badge: banner.badge,
       imageUrl: banner.imageUrl,
+      targetType: banner.targetType || (banner.targetServiceId ? 'service' : banner.targetProductId ? 'product' : 'none'),
       targetProductId: banner.targetProductId || '',
+      targetServiceId: banner.targetServiceId || '',
       active: Boolean(banner.active),
       discountHighlight: banner.discountHighlight || '',
     };
@@ -933,6 +935,8 @@ export async function registerWithEmail(email: string, pass: string, displayName
       displayName: displayName.trim() || (isAdmin ? 'Administrador' : 'Cliente'),
       phone: '',
       address: '',
+      privacyAcceptedAt: new Date().toISOString(),
+      healthConsent: false,
       role: isAdmin ? 'admin' : 'client',
       createdAt: new Date().toISOString(),
     });

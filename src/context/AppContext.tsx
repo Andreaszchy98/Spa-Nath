@@ -159,6 +159,7 @@ interface AppContextType {
   // Auth / Role / Users
   currentUser: CurrentUser;
   isAdminUser: boolean;
+  authInitialized: boolean;
   switchRole: (role: UserRole) => void;
   updateCurrentUser: (updates: Partial<CurrentUser>) => void;
   loginWithGoogle: () => Promise<void>;
@@ -183,6 +184,12 @@ interface AppContextType {
   modalProductId: string | null;
   openProductModal: (productId: string) => void;
   closeProductModal: () => void;
+
+  // Appointment / Service Booking Modal
+  isAppointmentModalOpen: boolean;
+  appointmentModalServiceId: string | null;
+  openAppointmentModal: (serviceId?: string) => void;
+  closeAppointmentModal: () => void;
 
   // Cart Drawer
   isCartDrawerOpen: boolean;
@@ -610,7 +617,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return Array.from(new Map(parsed.map((o: Order) => [o.id, o])).values());
+        }
       } catch (e) {
         console.error(e);
       }
@@ -712,7 +722,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
 
-    setOrders((prev) => [newOrder, ...prev]);
+    setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
     saveOrderFirestore(newOrder).catch((err) => console.warn('Firestore saveOrder error:', err));
 
     // Send push notification for new order: notifyAdmin + notifyCustomer
@@ -1241,7 +1251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return Array.from(new Map(parsed.map((a: Appointment) => [a.id, a])).values());
         }
       } catch (e) {}
     }
@@ -1432,7 +1442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
 
-    setAppointments((prev) => [newAppointment, ...prev]);
+    setAppointments((prev) => [newAppointment, ...prev.filter((a) => a.id !== newAppointment.id)]);
 
     // Send push notification: notifyAdmin + notifyCustomer
     notifyAdmin({
@@ -1764,6 +1774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Auth / Current User
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
     const savedUser = localStorage.getItem('bl_current_user_profile');
+    const localAccepted = typeof window !== 'undefined' && localStorage.getItem('bl_privacy_consent_accepted') === 'true';
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
@@ -1781,6 +1792,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             photoUrl: parsed.photoUrl,
             isLoggedIn: Boolean(parsed.isLoggedIn),
             authProvider: parsed.authProvider || 'guest',
+            privacyAcceptedAt: parsed.privacyAcceptedAt || (localAccepted ? new Date().toISOString() : undefined),
+            healthConsent: Boolean(parsed.healthConsent),
           };
         }
       } catch (e) {}
@@ -1793,6 +1806,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       emailVerified: false,
       isLoggedIn: false,
       authProvider: 'guest',
+      privacyAcceptedAt: localAccepted ? new Date().toISOString() : undefined,
+      healthConsent: false,
     };
   });
 
@@ -1825,6 +1840,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentUser((prev) => {
             const isSameUser = Boolean(prev.uid && prev.uid === fbUser.uid);
             const defaultName = isAuthorizedAdmin ? 'Administrador' : (fbUser.displayName || 'Cliente');
+            const localAccepted = typeof window !== 'undefined' && localStorage.getItem('bl_privacy_consent_accepted') === 'true';
+            const finalPrivacyAcceptedAt = profile?.privacyAcceptedAt || (isSameUser ? prev.privacyAcceptedAt : undefined) || (localAccepted ? new Date().toISOString() : undefined);
+            const finalHealthConsent = profile?.healthConsent !== undefined ? profile.healthConsent : (isSameUser ? (prev.healthConsent || false) : false);
             const updated: CurrentUser = {
               role: assignedRole,
               name: profile?.displayName || fbUser.displayName || (isSameUser ? prev.name : '') || defaultName,
@@ -1836,11 +1854,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               photoUrl: fbUser.photoURL || profile?.photoURL || undefined,
               isLoggedIn: true,
               authProvider: fbUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'password',
-              privacyAcceptedAt: profile?.privacyAcceptedAt || (isSameUser ? prev.privacyAcceptedAt : undefined),
-              healthConsent: profile?.healthConsent !== undefined ? profile.healthConsent : (isSameUser ? (prev.healthConsent || false) : false),
+              privacyAcceptedAt: finalPrivacyAcceptedAt,
+              healthConsent: finalHealthConsent,
             };
             try {
               localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
+              if (finalPrivacyAcceptedAt) {
+                localStorage.setItem('bl_privacy_consent_accepted', 'true');
+              }
               localStorage.setItem(STORAGE_KEYS.ROLE, assignedRole);
             } catch (_) {}
             return updated;
@@ -1903,12 +1924,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubOrders = subscribeOrders(
       (remoteOrders) => {
         if (!isEffectMounted) return;
-        setOrders(remoteOrders);
+        const uniqueOrders = Array.from(new Map(remoteOrders.map((o) => [o.id, o])).values());
+        setOrders(uniqueOrders);
         setFirebaseSyncStatus('synced');
 
         // Backfill legacy orders created without customerUid if matching currentUser
-        if (isManager && remoteOrders.length > 0 && currentUser.uid) {
-          remoteOrders.forEach((ord) => {
+        if (isManager && uniqueOrders.length > 0 && currentUser.uid) {
+          uniqueOrders.forEach((ord) => {
             if (!ord.customerUid && ord.customerName && ord.customerName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) {
               updateOrderCustomerUidFirestore(ord.id, currentUser.uid!).catch(() => {});
             }
@@ -1924,7 +1946,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubAppointments = subscribeAppointments(
       (remoteApps) => {
         if (!isEffectMounted) return;
-        setAppointments(remoteApps);
+        const uniqueApps = Array.from(new Map(remoteApps.map((a) => [a.id, a])).values());
+        setAppointments(uniqueApps);
       },
       () => {},
       isManager ? undefined : authUid,
@@ -1970,7 +1993,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return n.recipientUid === authUid;
         });
 
-        setNotifications(filtered);
+        const uniqueFiltered = Array.from(new Map(filtered.map((n) => [n.id, n])).values());
+        setNotifications(uniqueFiltered);
 
         // Dispara push solo para notificaciones nuevas no leídas (no en la carga inicial)
         if (initialLoadDone) {
@@ -2022,6 +2046,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updated = { ...prev, ...updates };
       try {
         localStorage.setItem('bl_current_user_profile', JSON.stringify(updated));
+        if (updated.privacyAcceptedAt) {
+          localStorage.setItem('bl_privacy_consent_accepted', 'true');
+        }
       } catch (_) {}
       // If user is authenticated in Firebase, sync changes to their Firestore profile
       if (prev.uid) {
@@ -2210,6 +2237,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Modals & Navigation States
   const [modalProductId, setModalProductId] = useState<string | null>(null);
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [appointmentModalServiceId, setAppointmentModalServiceId] = useState<string | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -2303,6 +2332,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setModalProductId(null);
   };
 
+  const openAppointmentModal = (serviceId?: string) => {
+    setAppointmentModalServiceId(serviceId || null);
+    setIsAppointmentModalOpen(true);
+  };
+
+  const closeAppointmentModal = () => {
+    setIsAppointmentModalOpen(false);
+    setAppointmentModalServiceId(null);
+  };
+
   // Reset to default
   const resetToDefaultData = () => {
     setProducts(INITIAL_PRODUCTS);
@@ -2382,6 +2421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearAllOrders,
         currentUser,
         isAdminUser,
+        authInitialized: authUid !== undefined,
         switchRole,
         updateCurrentUser,
         loginWithGoogle: loginWithGoogleHandler,
@@ -2402,6 +2442,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         modalProductId,
         openProductModal,
         closeProductModal,
+        isAppointmentModalOpen,
+        appointmentModalServiceId,
+        openAppointmentModal,
+        closeAppointmentModal,
         isCartDrawerOpen,
         setIsCartDrawerOpen,
         isNotificationDrawerOpen,

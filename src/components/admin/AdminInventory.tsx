@@ -488,13 +488,13 @@ export const AdminInventory: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredIngredients.map((ing) => {
+                    filteredIngredients.map((ing, ingIdx) => {
                     const isOut = ing.stock <= 0;
                     const isLow = !isOut && ing.stock <= ing.minStockAlert;
                     const usages = getIngredientUsages(ing.id);
 
                     return (
-                      <tr key={ing.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={`${ing.id}-${ingIdx}`} className="hover:bg-slate-50/80 transition-colors">
                         {/* Name */}
                         <td className="py-3 px-4">
                           <div className="font-bold text-slate-900 flex items-center gap-1.5">
@@ -699,7 +699,7 @@ export const AdminInventory: React.FC = () => {
 
           {/* Products Recipes Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {products.map((prod) => {
+            {products.map((prod, pIdx) => {
               const capacity = getTheoreticalCapacity(prod);
               const recipeCost = (prod.recipe || []).reduce((sum, r) => {
                 const ing = ingredients.find((i) => i.id === r.ingredientId);
@@ -711,7 +711,7 @@ export const AdminInventory: React.FC = () => {
 
               return (
                 <div
-                  key={prod.id}
+                  key={`${prod.id}-${pIdx}`}
                   className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-5 flex flex-col justify-between space-y-4"
                 >
                   {/* Product Header */}
@@ -936,7 +936,7 @@ export const AdminInventory: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredProducts.map((product) => {
+                  {filteredProducts.map((product, pIdx) => {
                     const margin =
                       product.price > 0
                         ? Math.round(
@@ -948,7 +948,7 @@ export const AdminInventory: React.FC = () => {
                     const isLow = !isOut && product.stock <= product.minStockAlert;
 
                     return (
-                      <tr key={product.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={`${product.id}-${pIdx}`} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <img

@@ -307,12 +307,12 @@ export const AdminLogistics: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredOrders.map((order) => {
+          {filteredOrders.map((order, oIdx) => {
             const isPickup = order.orderType === 'recoger';
 
             return (
               <div
-                key={order.id}
+                key={`${order.id}-${oIdx}`}
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4 transition-all hover:border-slate-300"
               >
                 {/* Header of shipment */}

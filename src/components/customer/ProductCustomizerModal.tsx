@@ -261,13 +261,13 @@ export const ProductCustomizerModal: React.FC = () => {
               {/* Option Groups */}
               {product.optionGroups.length > 0 && (
                 <div className="space-y-4">
-                  {product.optionGroups.map((group) => {
+                  {product.optionGroups.map((group, groupIdx) => {
                     const groupSelected = selections[group.id] || [];
                     const isGroupRequired = group.required;
 
                     return (
                       <div
-                        key={group.id}
+                        key={`${group.id}-${groupIdx}`}
                         className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/60 space-y-2.5 shadow-2xs"
                       >
                         {/* Group Header */}
@@ -293,7 +293,7 @@ export const ProductCustomizerModal: React.FC = () => {
 
                         {/* Options List without text truncation */}
                         <div className="space-y-2">
-                          {group.options.map((opt) => {
+                          {group.options.map((opt, optIdx) => {
                             const isSelected = groupSelected.includes(opt.id);
                             const linkedIng = opt.extraIngredientId
                               ? ingredients.find((i) => i.id === opt.extraIngredientId)
@@ -307,7 +307,7 @@ export const ProductCustomizerModal: React.FC = () => {
 
                             return (
                               <button
-                                key={opt.id}
+                                key={`${opt.id}-${optIdx}`}
                                 type="button"
                                 disabled={isOutOfStock}
                                 onClick={() => {

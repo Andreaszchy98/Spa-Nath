@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Tag, Award, Sparkles, Megaphone } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Tag, Award, Sparkles, Megaphone, Calendar, ShoppingBag } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { BannerBadge, PromoBanner } from '../../types';
 
 export const PromoBannerCarousel: React.FC = () => {
-  const { banners, products, openProductModal, theme } = useApp();
+  const { banners, products, services, openProductModal, openAppointmentModal, businessProfile, theme } = useApp();
   const activeBanners = banners.filter((b) => b.active);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -20,7 +20,15 @@ export const PromoBannerCarousel: React.FC = () => {
   if (activeBanners.length === 0) return null;
 
   const currentBanner = activeBanners[currentIndex] || activeBanners[0];
-  const targetProduct = currentBanner.targetProductId
+  
+  const isServiceTarget = currentBanner.targetType === 'service' || (!currentBanner.targetType && Boolean(currentBanner.targetServiceId));
+  const isProductTarget = currentBanner.targetType === 'product' || (!currentBanner.targetType && Boolean(currentBanner.targetProductId && !currentBanner.targetServiceId));
+
+  const targetService = isServiceTarget && currentBanner.targetServiceId
+    ? services.find((s) => s.id === currentBanner.targetServiceId)
+    : null;
+
+  const targetProduct = isProductTarget && currentBanner.targetProductId
     ? products.find((p) => p.id === currentBanner.targetProductId)
     : null;
 
@@ -51,8 +59,10 @@ export const PromoBannerCarousel: React.FC = () => {
   };
 
   const handleBannerClick = () => {
-    if (currentBanner.targetProductId) {
-      openProductModal(currentBanner.targetProductId);
+    if (targetService) {
+      openAppointmentModal(targetService.id);
+    } else if (targetProduct) {
+      openProductModal(targetProduct.id);
     }
   };
 
@@ -102,15 +112,30 @@ export const PromoBannerCarousel: React.FC = () => {
               {currentBanner.subtitle}
             </p>
 
-            {/* Target Product Action */}
+            {/* Target Action */}
             <div className="pt-2">
-              {targetProduct ? (
+              {targetService ? (
                 <button
+                  type="button"
                   onClick={handleBannerClick}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all shadow-md active:scale-95 ${theme.buttonClass}`}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 ${theme.buttonClass}`}
                 >
+                  <Calendar className="w-4 h-4" />
+                  <span>Agendar {targetService.name}</span>
+                  <span className="opacity-90">
+                    · {targetService.priceType === 'a_cotizar' ? 'A cotizar' : `${businessProfile.currency}${targetService.price}`}
+                  </span>
+                  <ArrowRight className="w-4 h-4 ml-0.5" />
+                </button>
+              ) : targetProduct ? (
+                <button
+                  type="button"
+                  onClick={handleBannerClick}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 ${theme.buttonClass}`}
+                >
+                  <ShoppingBag className="w-4 h-4" />
                   <span>Ver {targetProduct.name}</span>
-                  <span className="opacity-80">· ${targetProduct.price}</span>
+                  <span className="opacity-90">· ${targetProduct.price}</span>
                   <ArrowRight className="w-4 h-4 ml-0.5" />
                 </button>
               ) : (

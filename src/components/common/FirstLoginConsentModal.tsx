@@ -3,17 +3,33 @@ import { ShieldCheck, CheckCircle2, FileText, Lock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const FirstLoginConsentModal: React.FC = () => {
-  const { currentUser, updateCurrentUser, theme } = useApp();
+  const { currentUser, updateCurrentUser, theme, isAdminUser, authInitialized } = useApp();
   const [accepted, setAccepted] = useState(false);
   const [healthAccepted, setHealthAccepted] = useState(false);
 
-  // If user is not logged in, or has already accepted privacy, don't show
-  if (!currentUser.isLoggedIn || currentUser.privacyAcceptedAt) {
+  // Check if user already accepted privacy consent locally on this device
+  const isLocallyAccepted = typeof window !== 'undefined' && localStorage.getItem('bl_privacy_consent_accepted') === 'true';
+
+  // NEVER show if:
+  // 1. Auth has not initialized yet (prevents 1-second flash on page refresh)
+  // 2. User is not logged in
+  // 3. User is an administrator / manager
+  // 4. Consent has already been accepted locally or in user profile
+  if (
+    !authInitialized ||
+    !currentUser.isLoggedIn ||
+    isAdminUser ||
+    isLocallyAccepted ||
+    Boolean(currentUser.privacyAcceptedAt)
+  ) {
     return null;
   }
 
   const handleAccept = () => {
     if (!accepted) return;
+    try {
+      localStorage.setItem('bl_privacy_consent_accepted', 'true');
+    } catch (_) {}
     updateCurrentUser({
       privacyAcceptedAt: new Date().toISOString(),
       healthConsent: healthAccepted,

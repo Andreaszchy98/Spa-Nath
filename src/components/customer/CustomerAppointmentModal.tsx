@@ -117,11 +117,33 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   maxDateObj.setDate(maxDateObj.getDate() + 30);
   const maxDateStr = maxDateObj.toISOString().split('T')[0];
 
-  // Determine current step for progress bar
-  let currentStep = 1;
-  if (selectedServiceId && selectedProviderId) currentStep = 2;
-  if (selectedDate && selectedTime) currentStep = 3;
-  if (customerName.trim() && customerPhone.trim()) currentStep = 4;
+  // Progressive step completion validation for progress bar
+  const isStep1Done = Boolean(selectedServiceId && selectedProviderId);
+  const isStep2Done = Boolean(isStep1Done && selectedDate && selectedTime);
+  const isStep3Done = Boolean(
+    isStep2Done &&
+    customerName.trim().length >= 2 &&
+    customerPhone.trim().length >= 7
+  );
+  const isStep4Done = Boolean(isStep3Done && privacyAccepted);
+
+  const getStepIsFilled = (step: number) => {
+    switch (step) {
+      case 1:
+        return isStep1Done;
+      case 2:
+        return isStep2Done;
+      case 3:
+        return isStep3Done;
+      case 4:
+        return isStep4Done;
+      default:
+        return false;
+    }
+  };
+
+  // Determine active step that currently needs attention (1 to 4)
+  const currentActiveStep = !isStep1Done ? 1 : !isStep2Done ? 2 : !isStep3Done ? 3 : 4;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,20 +250,25 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                 { step: 3, label: 'Tus datos' },
                 { step: 4, label: 'Confirmar' },
               ].map((item) => {
-                const isPassed = currentStep > item.step;
-                const isCurrent = currentStep === item.step;
+                const isFilled = getStepIsFilled(item.step);
+                const isCurrent = currentActiveStep === item.step;
                 return (
                   <div key={item.step} className="space-y-1">
                     <div
-                      className={`h-1 rounded-full transition-all ${
-                        isPassed || isCurrent ? 'bg-rose-600' : 'bg-slate-200'
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        isFilled ? 'shadow-2xs' : 'bg-slate-200'
                       }`}
-                      style={isPassed || isCurrent ? { backgroundColor: theme.raw.primaryBtn } : undefined}
+                      style={isFilled ? { backgroundColor: theme.raw.primaryBtn } : undefined}
                     />
                     <span
-                      className={`text-[10px] font-bold block truncate ${
-                        isCurrent ? 'text-slate-900' : 'text-slate-400'
+                      className={`text-[10px] block truncate transition-colors duration-200 ${
+                        isFilled
+                          ? 'font-bold'
+                          : isCurrent
+                          ? 'font-extrabold text-slate-800'
+                          : 'font-medium text-slate-400'
                       }`}
+                      style={isFilled ? { color: theme.raw.primaryBtn } : undefined}
                     >
                       {item.step}. {item.label}
                     </span>
@@ -356,11 +383,11 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                   2. Terapeuta / Especialista
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {providers.map((prov) => {
+                  {providers.map((prov, provIdx) => {
                     const isSelected = selectedProviderId === prov.id;
                     return (
                       <button
-                        key={prov.id}
+                        key={`${prov.id}-${provIdx}`}
                         type="button"
                         onClick={() => {
                           setSelectedProviderId(prov.id);
@@ -430,11 +457,11 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200">
-                    {availableSlots.map((slot) => {
+                    {availableSlots.map((slot, sIdx) => {
                       const isSelected = selectedTime === slot;
                       return (
                         <button
-                          key={slot}
+                          key={`${slot}-${sIdx}`}
                           type="button"
                           onClick={() => setSelectedTime(slot)}
                           className={`py-2 px-2 rounded-xl text-xs font-bold transition-all ${

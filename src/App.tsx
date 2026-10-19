@@ -8,13 +8,24 @@ import { CustomerOrdersHistory } from './components/customer/CustomerOrdersHisto
 import { CustomerProfileView } from './components/customer/CustomerProfileView';
 import { BottomNavBar } from './components/customer/BottomNavBar';
 import { ProductCustomizerModal } from './components/customer/ProductCustomizerModal';
+import { CustomerAppointmentModal } from './components/customer/CustomerAppointmentModal';
 import { CartDrawer } from './components/customer/CartDrawer';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { FirstLoginConsentModal } from './components/common/FirstLoginConsentModal';
 import { ShieldCheck } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { theme, currentUser, customerTab, businessProfile, isPrivacyModalOpen, setIsPrivacyModalOpen } = useApp();
+  const {
+    theme,
+    currentUser,
+    customerTab,
+    businessProfile,
+    isPrivacyModalOpen,
+    setIsPrivacyModalOpen,
+    isAppointmentModalOpen,
+    closeAppointmentModal,
+    appointmentModalServiceId,
+  } = useApp();
   const isAdmin = currentUser.role === 'admin';
 
   return (
@@ -50,6 +61,11 @@ const AppContent: React.FC = () => {
 
       {/* Global Modals & Drawers */}
       <ProductCustomizerModal />
+      <CustomerAppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={closeAppointmentModal}
+        preselectedServiceId={appointmentModalServiceId || undefined}
+      />
       <CartDrawer />
       <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />
       <FirstLoginConsentModal />
