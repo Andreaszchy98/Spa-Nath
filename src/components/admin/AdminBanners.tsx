@@ -408,7 +408,7 @@ export const AdminBanners: React.FC = () => {
                       <option value="">-- Sin producto vinculado --</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} ({p.category} · ${p.price})
+                          {p.available === false ? '🔒 [Oculto] ' : ''}{p.name} ({p.category} · ${p.price})
                         </option>
                       ))}
                     </select>
@@ -432,7 +432,7 @@ export const AdminBanners: React.FC = () => {
                       <option value="">-- Sin servicio vinculado --</option>
                       {services.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} ({s.category} · ${s.price} · {s.durationMinutes} min)
+                          {s.available === false ? '🔒 [Oculto] ' : ''}{s.name} ({s.category} · ${s.price} · {s.durationMinutes} min)
                         </option>
                       ))}
                     </select>

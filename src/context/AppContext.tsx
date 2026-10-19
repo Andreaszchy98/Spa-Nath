@@ -129,6 +129,7 @@ interface AppContextType {
   addProduct: (product: Omit<Product, 'id'>) => string;
   updateProduct: (id: string, updates: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
+  toggleProductAvailability: (id: string) => void;
   adjustStock: (id: string, delta: number) => void;
   setProductRecipe: (productId: string, recipe: ProductRecipeItem[]) => void;
   clearProductRecipe: (productId: string) => void;
@@ -230,6 +231,7 @@ interface AppContextType {
   addService: (service: Omit<Service, 'id'>) => string;
   updateService: (id: string, updates: Partial<Service>) => void;
   deleteService: (id: string) => void;
+  toggleServiceAvailability: (id: string) => void;
   calculateServiceTotalDuration: (
     service: Service,
     modality?: 'local' | 'domicilio'
@@ -505,6 +507,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
     deleteProductFirestore(id).catch((err) => console.warn('Firestore deleteProduct error:', err));
+  };
+
+  const toggleProductAvailability = (id: string) => {
+    setProducts((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const newAvailable = target.available === false ? true : false;
+      const updated = prev.map((p) => (p.id === id ? { ...p, available: newAvailable } : p));
+      const updatedTarget = { ...target, available: newAvailable };
+      upsertProductFirestore(updatedTarget).catch((err) => console.warn('Firestore toggleProductAvailability error:', err));
+      return updated;
+    });
   };
 
   const adjustStock = (id: string, delta: number) => {
@@ -1126,6 +1140,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteService = (id: string) => {
     setServices((prev) => prev.filter((s) => s.id !== id));
     deleteServiceFirestore(id).catch((err) => console.warn('Firestore deleteService error:', err));
+  };
+
+  const toggleServiceAvailability = (id: string) => {
+    setServices((prev) => {
+      const target = prev.find((s) => s.id === id);
+      if (!target) return prev;
+      const newAvailable = target.available === false ? true : false;
+      const updated = prev.map((s) => (s.id === id ? { ...s, available: newAvailable } : s));
+      const updatedTarget = { ...target, available: newAvailable };
+      upsertServiceFirestore(updatedTarget).catch((err) => console.warn('Firestore toggleServiceAvailability error:', err));
+      return updated;
+    });
   };
 
   // Centralized total duration calculation in agenda (duración + pausa + traslado según modalidad y ida/vuelta)
@@ -2399,6 +2425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProduct,
         updateProduct,
         deleteProduct,
+        toggleProductAvailability,
         adjustStock,
         setProductRecipe,
         clearProductRecipe,
@@ -2463,6 +2490,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addService,
         updateService,
         deleteService,
+        toggleServiceAvailability,
         calculateServiceTotalDuration,
         providers,
         addProvider,

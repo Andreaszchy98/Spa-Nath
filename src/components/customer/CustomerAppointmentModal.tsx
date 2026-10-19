@@ -41,14 +41,16 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
     setIsPrivacyModalOpen,
   } = useApp();
 
+  const availableServices = services.filter((s) => s.available !== false);
+
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
-    preselectedServiceId || (services.length > 0 ? services[0].id : '')
+    preselectedServiceId || (availableServices.length > 0 ? availableServices[0].id : (services[0]?.id || ''))
   );
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
     providers.length > 0 ? providers[0].id : 'prov-1'
   );
 
-  const activeService: Service | undefined = services.find((s) => s.id === selectedServiceId) || services[0];
+  const activeService: Service | undefined = services.find((s) => s.id === selectedServiceId) || availableServices[0] || services[0];
 
   const selectedModality = 'local'; // Siempre local según requerimiento
 
@@ -101,10 +103,10 @@ export const CustomerAppointmentModal: React.FC<CustomerAppointmentModalProps> =
   useEffect(() => {
     if (preselectedServiceId) {
       setSelectedServiceId(preselectedServiceId);
-    } else if (services.length > 0 && !selectedServiceId) {
-      setSelectedServiceId(services[0].id);
+    } else if (availableServices.length > 0 && !selectedServiceId) {
+      setSelectedServiceId(availableServices[0].id);
     }
-  }, [preselectedServiceId, services, selectedServiceId]);
+  }, [preselectedServiceId, availableServices, selectedServiceId]);
 
   if (!isOpen) return null;
 

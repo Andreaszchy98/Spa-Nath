@@ -22,6 +22,8 @@ import {
   X,
   RefreshCw,
   Boxes,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Ingredient, IngredientUnit, Product, ProductRecipeItem } from '../../types';
@@ -31,6 +33,7 @@ export const AdminInventory: React.FC = () => {
     products,
     adjustStock,
     updateProduct,
+    toggleProductAvailability,
     setProductRecipe,
     clearProductRecipe,
     clearAllRecipes,
@@ -932,7 +935,8 @@ export const AdminInventory: React.FC = () => {
                     <th className="py-3 px-4">Margen %</th>
                     <th className="py-3 px-4">Existencias Mostrador</th>
                     <th className="py-3 px-4 text-center">Ajuste Rápido (+ / -)</th>
-                    <th className="py-3 px-4">Estado</th>
+                    <th className="py-3 px-4">Estado Stock</th>
+                    <th className="py-3 px-4 text-center">Visibilidad Catálogo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1065,6 +1069,35 @@ export const AdminInventory: React.FC = () => {
                               Óptimo
                             </span>
                           )}
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductAvailability(product.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all shadow-2xs ${
+                              product.available === false
+                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            }`}
+                            title={
+                              product.available === false
+                                ? 'Producto Oculto · Haz clic para activarlo y mostrarlo en el catálogo'
+                                : 'Producto Visible · Haz clic para desactivarlo y ocultarlo del catálogo de clientes'
+                            }
+                          >
+                            {product.available === false ? (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Oculto</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Visible</span>
+                              </>
+                            )}
+                          </button>
                         </td>
                       </tr>
                     );

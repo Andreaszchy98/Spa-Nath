@@ -14,16 +14,20 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
+  Eye,
+  EyeOff,
+  Power,
 } from 'lucide-react';
 import { Service, ServiceModality, ConfirmationType, PriceType } from '../../types';
 import { GoogleDriveInput } from '../common/GoogleDriveInput';
 
 export const AdminServices: React.FC = () => {
-  const { services, addService, updateService, deleteService, providers, businessProfile, theme } = useApp();
+  const { services, addService, updateService, deleteService, toggleServiceAvailability, providers, businessProfile, theme } = useApp();
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Accordion collapsed state per category (default true = collapsed/hidden)
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -38,8 +42,18 @@ export const AdminServices: React.FC = () => {
     });
   };
 
+  // Filter services by visibility
+  const filteredServices = services.filter((s) => {
+    if (visibilityFilter === 'active') return s.available !== false;
+    if (visibilityFilter === 'inactive') return s.available === false;
+    return true;
+  });
+
+  const activeServicesCount = services.filter((s) => s.available !== false).length;
+  const inactiveServicesCount = services.filter((s) => s.available === false).length;
+
   // Group services by category
-  const servicesByCategory = services.reduce((acc, s) => {
+  const servicesByCategory = filteredServices.reduce((acc, s) => {
     const cat = s.category.trim() || 'General';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(s);
@@ -51,6 +65,7 @@ export const AdminServices: React.FC = () => {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [category, setCategory] = useState('');
+  const [available, setAvailable] = useState<boolean>(true);
   const [priceType, setPriceType] = useState<PriceType>('fijo');
   const [price, setPrice] = useState<number>(0);
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
@@ -77,6 +92,7 @@ export const AdminServices: React.FC = () => {
     setDescription('');
     setImageUrl('');
     setCategory('');
+    setAvailable(true);
     setPriceType('fijo');
     setPrice(0);
     setDurationMinutes(60);
@@ -101,6 +117,7 @@ export const AdminServices: React.FC = () => {
     setDescription(serv.description);
     setImageUrl(serv.imageUrl);
     setCategory(serv.category);
+    setAvailable(serv.available !== false);
     setPriceType(serv.priceType);
     setPrice(serv.price);
     setDurationMinutes(serv.durationMinutes);
@@ -147,7 +164,7 @@ export const AdminServices: React.FC = () => {
       minCancellationHours: Math.max(0, Number(minCancellationHours)),
       minNoticeHours: Math.max(1, Number(minNoticeHours)),
       providerIds: selectedProviderIds,
-      available: true,
+      available: available,
     };
 
     if (editingServiceId) {
@@ -162,22 +179,68 @@ export const AdminServices: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">
-            Catálogo de Servicios de Spa & Tratamientos
-          </h2>
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              Catálogo de Servicios de Spa & Tratamientos
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Administra los servicios ofrecidos, su duración, terapeutas y activa u oculta los que desees para los clientes.
+            </p>
+          </div>
 
+          <button
+            type="button"
+            onClick={handleOpenNew}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 shrink-0 ${theme.buttonClass}`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Servicio</span>
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenNew}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 ${theme.buttonClass}`}
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Servicio</span>
-        </button>
+        {/* Filter Tabs by Visibility */}
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3 flex-wrap">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">
+            Filtro:
+          </span>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              visibilityFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Todos ({services.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('active')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              visibilityFilter === 'active'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Activos / Visibles ({activeServicesCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('inactive')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              visibilityFilter === 'inactive'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/60'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+            <span>Desactivados / Ocultos ({inactiveServicesCount})</span>
+          </button>
+        </div>
       </div>
 
       {/* Services Grouped by Category */}
@@ -228,89 +291,156 @@ export const AdminServices: React.FC = () => {
                 {/* Category Items Grid */}
                 {!isCollapsed && (
                   <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {catServices.map((serv, sIdx) => (
-                      <div key={`${serv.id}-${sIdx}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between">
-                        <div>
-                          <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                            <img
-                              src={serv.imageUrl}
-                              alt={serv.name}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 flex-wrap">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-slate-900">
-                                {serv.category}
-                              </span>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white capitalize">
-                                {serv.modality}
-                              </span>
-                            </div>
-                          </div>
+                    {catServices.map((serv, sIdx) => {
+                      const isHidden = serv.available === false;
+                      return (
+                        <div
+                          key={`${serv.id}-${sIdx}`}
+                          className={`bg-white rounded-2xl border overflow-hidden shadow-2xs flex flex-col justify-between transition-all ${
+                            isHidden
+                              ? 'border-amber-300/80 bg-slate-50/60 opacity-80'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                              <img
+                                src={serv.imageUrl}
+                                alt={serv.name}
+                                className={`w-full h-full object-cover transition-all ${isHidden ? 'grayscale-[40%]' : ''}`}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                              <div className="absolute top-2.5 left-2.5 flex items-center gap-1 flex-wrap">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-slate-900 shadow-2xs">
+                                  {serv.category}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white capitalize shadow-2xs">
+                                  {serv.modality}
+                                </span>
+                              </div>
 
-                          <div className="p-4 space-y-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <h3 className="font-bold text-slate-900 text-sm leading-snug">{serv.name}</h3>
-                              <span className="font-mono font-extrabold text-slate-900 text-sm shrink-0">
-                                {serv.priceType === 'a_cotizar'
-                                  ? 'A cotizar'
-                                  : `${serv.priceType === 'desde' ? 'Desde ' : ''}${businessProfile.currency}${serv.price}`}
-                              </span>
+                              {/* Visibility Status Badge & Direct Toggle */}
+                              <div className="absolute top-2.5 right-2.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleServiceAvailability(serv.id);
+                                  }}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-xs flex items-center gap-1 shadow-xs transition-all cursor-pointer ${
+                                    isHidden
+                                      ? 'bg-slate-900/90 text-amber-300 border border-amber-500/30 hover:bg-slate-900 hover:scale-105'
+                                      : 'bg-emerald-600/95 text-white hover:bg-emerald-700 hover:scale-105'
+                                  }`}
+                                  title={
+                                    isHidden
+                                      ? 'Servicio Oculto · Haz clic para activarlo y mostrarlo en el catálogo'
+                                      : 'Servicio Activo · Haz clic para desactivarlo y ocultarlo del catálogo'
+                                  }
+                                >
+                                  {isHidden ? (
+                                    <>
+                                      <EyeOff className="w-3 h-3 text-amber-400" />
+                                      <span>Oculto</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="w-3 h-3 text-emerald-200" />
+                                      <span>Activo</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </div>
-                            <p className="text-xs text-slate-500 line-clamp-2">{serv.description}</p>
 
-                            <div className="pt-2 flex items-center justify-between gap-2 text-[11px] text-slate-600 border-t border-slate-100">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{serv.durationMinutes} min (+{serv.bufferMinutes}p)</span>
+                            <div className="p-4 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <h3 className="font-bold text-slate-900 text-sm leading-snug">{serv.name}</h3>
+                                <span className="font-mono font-extrabold text-slate-900 text-sm shrink-0">
+                                  {serv.priceType === 'a_cotizar'
+                                    ? 'A cotizar'
+                                    : `${serv.priceType === 'desde' ? 'Desde ' : ''}${businessProfile.currency}${serv.price}`}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 line-clamp-2">{serv.description}</p>
+
+                              <div className="pt-2 flex items-center justify-between gap-2 text-[11px] text-slate-600 border-t border-slate-100">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{serv.durationMinutes} min (+{serv.bufferMinutes}p)</span>
+                                  </div>
+                                  {serv.modality !== 'local' && (
+                                    <div className="flex items-center gap-1 text-amber-700">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      <span>Hasta {serv.maxHomeZoneKm} km</span>
+                                    </div>
+                                  )}
                                 </div>
-                                {serv.modality !== 'local' && (
-                                  <div className="flex items-center gap-1 text-amber-700">
-                                    <MapPin className="w-3.5 h-3.5" />
-                                    <span>Hasta {serv.maxHomeZoneKm} km</span>
+                                {serv.providerIds && serv.providerIds.length > 0 && (
+                                  <div className="flex items-center gap-1 text-slate-500 font-medium">
+                                    <Users className="w-3 h-3 text-slate-400" />
+                                    <span>{serv.providerIds.length} personal</span>
                                   </div>
                                 )}
                               </div>
-                              {serv.providerIds && serv.providerIds.length > 0 && (
-                                <div className="flex items-center gap-1 text-slate-500 font-medium">
-                                  <Users className="w-3 h-3 text-slate-400" />
-                                  <span>{serv.providerIds.length} personal</span>
-                                </div>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 text-xs flex-wrap">
+                            {/* Toggle Deactivate / Hide Button */}
+                            <button
+                              type="button"
+                              onClick={() => toggleServiceAvailability(serv.id)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
+                                isHidden
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
+                                  : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-300'
+                              }`}
+                              title={
+                                isHidden
+                                  ? 'Activar servicio (Hacerlo visible para agendar en el catálogo)'
+                                  : 'Desactivar / Ocultar servicio (No aparecerá en el catálogo para clientes)'
+                              }
+                            >
+                              {isHidden ? (
+                                <>
+                                  <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Activar</span>
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Desactivar</span>
+                                </>
                               )}
+                            </button>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(serv)}
+                                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setServiceToDelete(serv)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title="Eliminar servicio"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
-
-                        <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
-                          <span className="text-[10px] uppercase font-bold text-slate-500">
-                            Confirmación: {serv.confirmationType}
-                          </span>
-
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(serv)}
-                              className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg font-semibold flex items-center gap-1 transition-colors"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                              <span>Editar</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setServiceToDelete(serv)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Eliminar servicio"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -343,6 +473,44 @@ export const AdminServices: React.FC = () => {
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Visibility Status Card */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-xs">Visibilidad del Servicio</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        available
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {available ? 'Visible en Catálogo' : 'Oculto al Cliente'}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-0.5">
+                    {available
+                      ? 'Las clientas podrán ver y reservar este servicio en el catálogo público.'
+                      : 'El servicio estará oculto y no aparecerá para agendar citas en el catálogo.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAvailable(!available)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    available ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                  role="switch"
+                  aria-checked={available}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      available ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               <div className="space-y-3">
                 <h4 className="font-bold text-slate-900 uppercase tracking-wider text-slate-600">
                   1. Información Principal

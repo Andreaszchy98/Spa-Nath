@@ -31,11 +31,11 @@ export const CustomerCatalogView: React.FC = () => {
     });
   };
 
-  // Available physical products (not services)
-  const availableProducts = products.filter((p) => p.available);
+  // Available physical products (not hidden/deactivated)
+  const availableProducts = products.filter((p) => p.available !== false);
 
-  // Available spa services
-  const availableServices = services.filter((s) => s.available);
+  // Available spa services (not hidden/deactivated)
+  const availableServices = services.filter((s) => s.available !== false);
 
   const hasProducts = availableProducts.length > 0;
   const hasServices = availableServices.length > 0;

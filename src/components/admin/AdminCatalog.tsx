@@ -13,6 +13,9 @@ import {
   Package,
   ChefHat,
   Scale,
+  Eye,
+  EyeOff,
+  Power,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GoogleDriveInput } from '../common/GoogleDriveInput';
@@ -31,6 +34,7 @@ export const AdminCatalog: React.FC = () => {
     addProduct,
     updateProduct,
     deleteProduct,
+    toggleProductAvailability,
     businessProfile,
     theme,
     ingredients,
@@ -40,6 +44,7 @@ export const AdminCatalog: React.FC = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Quick register central ingredient for an option
   const [optionForNewIng, setOptionForNewIng] = useState<{
@@ -55,11 +60,22 @@ export const AdminCatalog: React.FC = () => {
   const [newIngCategory, setNewIngCategory] = useState('Insumos de Opciones');
   const [newIngConsumeQty, setNewIngConsumeQty] = useState<number>(1);
 
+  // Filter products by visibility
+  const filteredProducts = products.filter((p) => {
+    if (visibilityFilter === 'active') return p.available !== false;
+    if (visibilityFilter === 'inactive') return p.available === false;
+    return true;
+  });
+
+  const activeProductsCount = products.filter((p) => p.available !== false).length;
+  const inactiveProductsCount = products.filter((p) => p.available === false).length;
+
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Productos');
   const [type, setType] = useState<ProductType>('producto_fisico');
+  const [available, setAvailable] = useState<boolean>(true);
   const [price, setPrice] = useState<number>(0);
   const [costPrice, setCostPrice] = useState<number>(0);
   const [stock, setStock] = useState<number>(0);
@@ -75,6 +91,7 @@ export const AdminCatalog: React.FC = () => {
     setDescription('');
     setCategory('Productos');
     setType('producto_fisico');
+    setAvailable(true);
     setPrice(0);
     setCostPrice(0);
     setStock(0);
@@ -92,6 +109,7 @@ export const AdminCatalog: React.FC = () => {
     setDescription(prod.description);
     setCategory(prod.category);
     setType(prod.type);
+    setAvailable(prod.available !== false);
     setPrice(prod.price);
     setCostPrice(prod.costPrice);
     setStock(prod.stock);
@@ -293,7 +311,7 @@ export const AdminCatalog: React.FC = () => {
       minStockAlert: Math.max(0, Number(minStockAlert) || 0),
       imageUrl: imageUrl.trim() || '',
       badge: badge.trim() || undefined,
-      available: true,
+      available: available,
       optionGroups,
       recipe,
     };
@@ -310,21 +328,67 @@ export const AdminCatalog: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">
-            Catálogo de Productos
-          </h2>
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              Catálogo de Productos
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Administra los productos de retail/skincare, precios, stock y activa u oculta los que desees para los clientes.
+            </p>
+          </div>
 
+          <button
+            onClick={handleOpenNewProduct}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 shrink-0 ${theme.buttonClass}`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Producto</span>
+          </button>
         </div>
 
-        <button
-          onClick={handleOpenNewProduct}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 ${theme.buttonClass}`}
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Producto</span>
-        </button>
+        {/* Filter Tabs by Visibility */}
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3 flex-wrap">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">
+            Filtro:
+          </span>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              visibilityFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Todos ({products.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('active')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              visibilityFilter === 'active'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+            }`}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Activos / Visibles ({activeProductsCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibilityFilter('inactive')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              visibilityFilter === 'inactive'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/60'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+            <span>Desactivados / Ocultos ({inactiveProductsCount})</span>
+          </button>
+        </div>
       </div>
 
       {/* Products Grid */}
@@ -336,86 +400,162 @@ export const AdminCatalog: React.FC = () => {
             El catálogo está listo para que registres tus productos físicos cuando los subas. Haz clic en "Nuevo Producto" para comenzar.
           </p>
         </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
+          <Package className="w-12 h-12 text-slate-300 mx-auto" />
+          <h3 className="text-base font-bold text-slate-800">
+            {visibilityFilter === 'active' ? 'No hay productos activos' : 'No hay productos ocultos'}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {visibilityFilter === 'active'
+              ? 'Todos los productos están actualmente desactivados u ocultos.'
+              : 'No hay productos desactivados u ocultos en este momento.'}
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {products.map((product, pIdx) => (
-          <div
-            key={`${product.id}-${pIdx}`}
-            className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between"
-          >
-            <div>
-              <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <div className="absolute top-2.5 left-2.5 flex items-center gap-1">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-slate-900">
-                    {product.type}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white">
-                    {product.category}
-                  </span>
+          {filteredProducts.map((product, pIdx) => {
+            const isHidden = product.available === false;
+            return (
+              <div
+                key={`${product.id}-${pIdx}`}
+                className={`bg-white rounded-2xl border overflow-hidden shadow-2xs flex flex-col justify-between transition-all ${
+                  isHidden
+                    ? 'border-amber-300/80 bg-slate-50/60 opacity-80'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className={`w-full h-full object-cover transition-all ${isHidden ? 'grayscale-[40%]' : ''}`}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-slate-900 shadow-2xs">
+                        {product.type}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white shadow-2xs">
+                        {product.category}
+                      </span>
+                    </div>
+
+                    {/* Visibility Status Badge & Direct Toggle */}
+                    <div className="absolute top-2.5 right-2.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleProductAvailability(product.id);
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-xs flex items-center gap-1 shadow-xs transition-all cursor-pointer ${
+                          isHidden
+                            ? 'bg-slate-900/90 text-amber-300 border border-amber-500/30 hover:bg-slate-900 hover:scale-105'
+                            : 'bg-emerald-600/95 text-white hover:bg-emerald-700 hover:scale-105'
+                        }`}
+                        title={
+                          isHidden
+                            ? 'Producto Oculto · Haz clic para activarlo y mostrarlo en el catálogo'
+                            : 'Producto Activo · Haz clic para desactivarlo y ocultarlo del catálogo'
+                        }
+                      >
+                        {isHidden ? (
+                          <>
+                            <EyeOff className="w-3 h-3 text-amber-400" />
+                            <span>Oculto</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3 h-3 text-emerald-200" />
+                            <span>Activo</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug">
+                        {product.name}
+                      </h3>
+                      <span className="font-mono font-extrabold text-slate-900 text-sm shrink-0">
+                        {businessProfile.currency}{product.price}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 line-clamp-2">
+                      {product.description}
+                    </p>
+
+                    {/* Modifiers Count Summary */}
+                    <div className="pt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>
+                        {product.optionGroups?.length || 0} grupo(s) de opciones configurados
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions Bar */}
+                <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 text-xs flex-wrap">
+                  {/* Toggle Deactivate / Hide Button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleProductAvailability(product.id)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
+                      isHidden
+                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
+                        : 'bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-slate-300'
+                    }`}
+                    title={
+                      isHidden
+                        ? 'Activar producto (Hacerlo visible para comprar en el catálogo)'
+                        : 'Desactivar / Ocultar producto (No aparecerá en el catálogo para clientes)'
+                    }
+                  >
+                    {isHidden ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Activar</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Desactivar</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditProduct(product)}
+                      className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Editar & Opciones</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductToDelete(product)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Eliminar producto"
+                      aria-label="Eliminar producto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm leading-snug">
-                    {product.name}
-                  </h3>
-                  <span className="font-mono font-extrabold text-slate-900 text-sm shrink-0">
-                    {businessProfile.currency}{product.price}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 line-clamp-2">
-                  {product.description}
-                </p>
-
-                {/* Modifiers Count Summary */}
-                <div className="pt-1 flex items-center gap-2 text-[11px] text-slate-500">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>
-                    {product.optionGroups?.length || 0} grupo(s) de opciones configurados
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions Bar */}
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
-              <span className="text-[11px] text-slate-500">
-                Stock: <strong>{product.stock}</strong> unidades
-              </span>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditProduct(product)}
-                  className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg font-semibold flex items-center gap-1 transition-colors"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  <span>Editar & Opciones</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProductToDelete(product)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  title="Eliminar producto"
-                  aria-label="Eliminar producto"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Product Creator & Customizer Builder Modal */}
@@ -446,6 +586,45 @@ export const AdminCatalog: React.FC = () => {
 
             {/* Scrollable Form Body */}
             <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden space-y-6 flex-1 text-xs">
+              {/* Visibilidad / Activar u Ocultar Producto */}
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-xs">Visibilidad del Producto</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        available
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {available ? 'Visible en Catálogo' : 'Oculto al Cliente'}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-0.5">
+                    {available
+                      ? 'Las clientas podrán ver y comprar este producto en el catálogo público.'
+                      : 'El producto estará desactivado/oculto y no aparecerá en el catálogo para clientes.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAvailable(!available)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    available ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                  role="switch"
+                  aria-checked={available}
+                  title={available ? 'Haz clic para desactivar u ocultar' : 'Haz clic para activar'}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      available ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Section 1: Basic Info */}
               <div className="space-y-4">
                 <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5 text-slate-600">

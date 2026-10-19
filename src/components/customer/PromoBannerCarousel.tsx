@@ -25,11 +25,11 @@ export const PromoBannerCarousel: React.FC = () => {
   const isProductTarget = currentBanner.targetType === 'product' || (!currentBanner.targetType && Boolean(currentBanner.targetProductId && !currentBanner.targetServiceId));
 
   const targetService = isServiceTarget && currentBanner.targetServiceId
-    ? services.find((s) => s.id === currentBanner.targetServiceId)
+    ? services.find((s) => s.id === currentBanner.targetServiceId && s.available !== false)
     : null;
 
   const targetProduct = isProductTarget && currentBanner.targetProductId
-    ? products.find((p) => p.id === currentBanner.targetProductId)
+    ? products.find((p) => p.id === currentBanner.targetProductId && p.available !== false)
     : null;
 
   const getBadgeIcon = (badge: BannerBadge) => {
